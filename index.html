@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Taxi Recettes">
+<meta name="theme-color" content="#0F172A">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<title>Taxi Recettes</title>
+<style>
+:root{
+  --bg:#F1F5F9; --surface:#FFFFFF; --surface2:#F8FAFC;
+  --text:#0F172A; --text2:#64748B;
+  --primary:#1E3A5F; --on-primary:#FFFFFF;
+  --accent:#059669; --accent-press:#047857; --on-accent:#FFFFFF;
+  --border:#E2E8F0; --danger:#DC2626;
+  --chip-bg:#EEF2F7; --shadow:0 1px 3px rgba(15,23,42,.08),0 4px 14px rgba(15,23,42,.05);
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0B1220; --surface:#151E31; --surface2:#1D283E;
+    --text:#F1F5F9; --text2:#94A3B8;
+    --primary:#27476E; --on-primary:#FFFFFF;
+    --accent:#10B981; --accent-press:#059669; --on-accent:#06281D;
+    --border:#26324A; --danger:#F87171;
+    --chip-bg:#1D283E; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--text); font-size:16px; line-height:1.5;
+  min-height:100dvh;
+}
+.wrap{max-width:480px;margin:0 auto;padding:0 14px calc(96px + env(safe-area-inset-bottom))}
+header.app{
+  position:sticky;top:0;z-index:40;
+  background:var(--primary);color:var(--on-primary);
+  padding:calc(10px + env(safe-area-inset-top)) 18px 10px;
+  display:flex;align-items:center;gap:10px;
+}
+header.app svg{flex:none}
+header.app h1{font-size:17px;font-weight:700;letter-spacing:.2px}
+header.app .sub{margin-left:auto;font-size:13px;opacity:.85;display:flex;align-items:center;gap:6px}
+.livedot{width:8px;height:8px;border-radius:50%;background:#34D399;display:inline-block}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:16px;margin-top:14px;
+}
+.card h2{font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.card h2 svg{color:var(--accent)}
+.statebadge{margin-left:auto;font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;text-transform:none;letter-spacing:.2px}
+.statebadge.open{background:rgba(5,150,105,.14);color:var(--accent)}
+.statebadge.closed{background:var(--chip-bg);color:var(--text2)}
+label.fld{display:block;font-size:13px;font-weight:600;color:var(--text2);margin:10px 0 4px}
+input[type=text],input[type=date]{
+  width:100%;font-size:16px;padding:12px;border-radius:12px;
+  border:1.5px solid var(--border);background:var(--surface2);color:var(--text);
+  min-height:48px;appearance:none;-webkit-appearance:none;
+}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(5,150,105,.18)}
+input:disabled{opacity:.55}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kmres{margin-top:12px;font-size:14px;color:var(--text2)}
+.kmres strong{color:var(--text);font-size:16px}
+.warn{color:var(--danger);font-size:13px;font-weight:600;margin-top:6px}
+/* chips */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;border:1.5px solid var(--border);background:var(--chip-bg);color:var(--text);
+  padding:10px 16px;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;
+  min-height:44px;transition:transform .15s ease,background .15s ease,border-color .15s ease;
+}
+.chip:active{transform:scale(.96)}
+.chip.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+/* segmented */
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--chip-bg);border-radius:12px;padding:4px;gap:4px}
+.seg button{
+  border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:600;
+  padding:10px 4px;border-radius:9px;cursor:pointer;min-height:44px;transition:background .15s,color .15s;
+}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.15)}
+.amount-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;
+  min-height:48px;padding:0 18px;transition:transform .15s ease,background .15s ease;
+}
+.btn:active{transform:scale(.97)}
+.btn-accent{background:var(--accent);color:var(--on-accent)}
+.btn-accent:active{background:var(--accent-press)}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-ghost{background:var(--chip-bg);color:var(--text)}
+.btn-full{width:100%;margin-top:12px}
+.btn-big{min-height:56px;font-size:17px}
+/* lists */
+.list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.item{
+  display:flex;align-items:center;gap:10px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:12px;padding:10px 12px;
+}
+.item .who{flex:1;min-width:0}
+.item .who .l1{font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.item .who .l2{font-size:12.5px;color:var(--text2)}
+.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--chip-bg);color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.badge.app{background:rgba(37,99,235,.12);color:#2563EB}
+.badge.cash{background:rgba(217,119,6,.14);color:#B45309}
+.badge.sumup{background:rgba(5,150,105,.13);color:var(--accent)}
+@media (prefers-color-scheme: dark){
+  .badge.app{color:#7FA8F5}.badge.cash{color:#E5A34D}
+}
+.item .amt{text-align:right;font-variant-numeric:tabular-nums}
+.item .amt .net{font-weight:700;font-size:16px}
+.item .amt .brut{font-size:12px;color:var(--text2)}
+.icon-btn{
+  flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;border-radius:10px;color:var(--text2);cursor:pointer;
+}
+.icon-btn:active{background:var(--chip-bg);transform:scale(.94)}
+.icon-btn.danger{color:var(--danger)}
+.empty{padding:18px 6px;text-align:center;color:var(--text2);font-size:14px}
+/* summary */
+.sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px}
+.stat .k{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.stat .v{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+.stat .v.acc{color:var(--accent)}
+.stat.wide{grid-column:1 / -1;display:flex;align-items:baseline;justify-content:space-between}
+.stat.wide .v{font-size:17px}
+/* history */
+.hist{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;box-shadow:var(--shadow)}
+.hist:active{transform:scale(.98)}
+.hist .d{flex:1}
+.hist .d .l1{font-weight:700;font-size:15px;text-transform:capitalize}
+.hist .d .l2{font-size:13px;color:var(--text2)}
+.hist .n{text-align:right}
+.hist .n .net{font-weight:800;font-size:17px;color:var(--accent);font-variant-numeric:tabular-nums}
+.hist .n .lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.hist .n .lbl.encours{color:var(--accent)}
+/* settings */
+.src-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.src-row:last-child{border-bottom:none}
+.src-row .nm{flex:1;font-weight:600;font-size:15px}
+.src-row input{width:86px;text-align:right;min-height:44px;padding:8px 10px}
+.src-row .pct{color:var(--text2);font-size:14px}
+.note{font-size:13px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px}
+.banner{
+  width:100%;display:flex;align-items:center;gap:10px;margin-top:10px;
+  background:rgba(5,150,105,.1);border:1.5px solid var(--accent);border-radius:12px;
+  padding:12px;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;text-align:left;
+}
+/* tabs */
+nav.tabs{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+  display:flex;justify-content:space-around;
+}
+nav.tabs button{
+  flex:1;max-width:140px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:none;border:none;color:var(--text2);font-size:11.5px;font-weight:600;
+  padding:6px 4px;border-radius:12px;cursor:pointer;min-height:52px;
+}
+nav.tabs button.on{color:var(--accent)}
+nav.tabs button:active{transform:scale(.95)}
+.view{display:none}
+.view.on{display:block;animation:fadein .2s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+/* toast */
+#toast{
+  position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(16px);
+  background:var(--text);color:var(--bg);padding:10px 18px;border-radius:999px;
+  font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
+  display:flex;align-items:center;gap:8px;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+  <h1>Taxi Recettes</h1>
+  <span class="sub" id="headSub"></span>
+</header>
+
+<div class="wrap">
+
+<!-- ===================== JOURNÉE ===================== -->
+<section class="view on" id="view-day">
+
+  <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>Date du jour</h2>
+    <input type="date" id="dateInput" aria-label="Date du jour">
+    <button type="button" class="banner hidden" id="activeBanner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span id="activeBannerTxt"></span>
+    </button>
+  </div>
+
+  <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>Kilométrage <span class="statebadge hidden" id="stateBadge"></span></h2>
+    <div class="row2">
+      <div>
+        <label class="fld" for="kmStart">Début de journée</label>
+        <input type="text" id="kmStart" inputmode="numeric" placeholder="ex : 145230">
+      </div>
+      <div id="kmEndWrap">
+        <label class="fld" for="kmEnd">Fin de journée</label>
+        <input type="text" id="kmEnd" inputmode="numeric" placeholder="ex : 145480">
+      </div>
+    </div>
+    <div class="kmres" id="kmRes"></div>
+    <button type="button" class="btn btn-accent btn-full btn-big" id="openDayBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      Ouvrir la journée
+    </button>
+    <button type="button" class="btn btn-primary btn-full btn-big" id="closeDayBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Clôturer la journée
+    </button>
+    <button type="button" class="btn btn-ghost btn-full" id="reopenBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+      Rouvrir la journée
+    </button>
+  </div>
+
+  <div class="card" id="cardCourses">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>Courses</h2>
+    <div id="addRideForm">
+      <label class="fld">Source</label>
+      <div class="chips" id="srcChips" role="radiogroup" aria-label="Source de la course"></div>
+      <label class="fld">Paiement</label>
+      <div class="seg" id="paySeg" role="radiogroup" aria-label="Mode de paiement">
+        <button type="button" data-pay="app">App / Facturé</button>
+        <button type="button" data-pay="cash">Cash</button>
+        <button type="button" data-pay="sumup">SumUp</button>
+      </div>
+      <div class="amount-row">
+        <input type="text" id="amount" inputmode="decimal" placeholder="Montant € — ex : 42,96" aria-label="Montant de la course en euros">
+        <button type="button" class="btn btn-accent" id="addRide">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Ajouter
+        </button>
+      </div>
+    </div>
+    <div class="list" id="rideList"></div>
+  </div>
+
+  <div class="card" id="cardCharges">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M15 8.5a3 3 0 0 0-5 0v7a3 3 0 0 0 5 0"/><path d="M8 12h6"/></svg>Charges</h2>
+    <div id="addChargeForm">
+      <div class="row2">
+        <input type="text" id="chargeLabel" placeholder="Carburant, lavage…" aria-label="Description de la charge">
+        <input type="text" id="chargeAmt" inputmode="decimal" placeholder="Montant €" aria-label="Montant de la charge en euros">
+      </div>
+      <button type="button" class="btn btn-ghost btn-full" id="addCharge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        Ajouter la charge
+      </button>
+    </div>
+    <div class="list" id="chargeList"></div>
+  </div>
+
+  <div class="card" id="cardSummary">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>Résumé de la journée</h2>
+    <div class="sumgrid" id="sumGrid"></div>
+    <button type="button" class="btn btn-primary btn-full" id="pdfBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+      Télécharger le PDF
+    </button>
+  </div>
+
+</section>
+
+<!-- ===================== HISTORIQUE ===================== -->
+<section class="view" id="view-history">
+  <div class="card" style="background:transparent;border:none;box-shadow:none;padding:16px 2px 0">
+    <h2 style="margin-bottom:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Journées enregistrées</h2>
+  </div>
+  <div class="list" id="histList" style="margin-top:10px"></div>
+</section>
+
+<!-- ===================== RÉGLAGES ===================== -->
+<section class="view" id="view-settings">
+
+  <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Sources &amp; retenues</h2>
+    <div id="srcSettings"></div>
+    <div class="note">La retenue s'applique uniquement aux courses payées en <strong>cash</strong> ou <strong>SumUp</strong>. Les courses payées par l'app ou facturées sont enregistrées en net (retenue 0). Modifier un taux ne change pas les anciennes courses.</div>
+  </div>
+
+  <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Ajouter une source</h2>
+    <div class="row2">
+      <input type="text" id="newSrcName" placeholder="Nom — ex : Aéroport" aria-label="Nom de la nouvelle source">
+      <input type="text" id="newSrcRate" inputmode="decimal" placeholder="Retenue %" aria-label="Pourcentage de retenue">
+    </div>
+    <button type="button" class="btn btn-accent btn-full" id="addSrcBtn">Ajouter la source</button>
+  </div>
+
+  <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>Sauvegarde</h2>
+    <button type="button" class="btn btn-ghost btn-full" id="exportBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+      Exporter mes données
+    </button>
+    <button type="button" class="btn btn-ghost btn-full" id="importBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      Importer une sauvegarde
+    </button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    <div class="note">Vos données restent sur ce téléphone. Pensez à exporter une sauvegarde de temps en temps (le fichier peut être gardé dans iCloud, envoyé par e-mail ou WhatsApp).</div>
+  </div>
+
+</section>
+</div>
+
+<nav class="tabs" aria-label="Navigation principale">
+  <button type="button" class="on" data-tab="day" aria-label="Journée">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+    Journée
+  </button>
+  <button type="button" data-tab="history" aria-label="Historique">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Historique
+  </button>
+  <button type="button" data-tab="settings" aria-label="Réglages">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    Réglages
+  </button>
+</nav>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============================== DONNÉES ============================== */
+const STORE_KEY = 'taxiRecettesV1';
+const DEFAULT_SOURCES = [
+  {id:'uber',     name:'Uber',          rate:33, builtin:true},
+  {id:'bolt',     name:'Bolt',          rate:30, builtin:true},
+  {id:'heetch',   name:'Heetch',        rate:18, builtin:true},
+  {id:'taxivert', name:'Taxis Verts',   rate:0,  builtin:true},
+  {id:'prive',    name:'Course privée', rate:0,  builtin:true},
+];
+function freshDb(){ return {version:2, sources:JSON.parse(JSON.stringify(DEFAULT_SOURCES)), days:{}, activeDay:null}; }
+
+/* Valide et nettoie en profondeur toute donnée venant du stockage ou d'un import */
+function normalizeDb(d){
+  const out = freshDb();
+  if(!d || typeof d!=='object' || Array.isArray(d)) return out;
+  if(Array.isArray(d.sources)){
+    const srcs = d.sources
+      .filter(s=>s && typeof s==='object' && typeof s.id==='string' && typeof s.name==='string')
+      .map(s=>({id:s.id, name:s.name, rate:Math.min(100,Math.max(0,Number(s.rate)||0)), builtin:!!s.builtin}));
+    if(srcs.length) out.sources = srcs;
+  }
+  if(d.days && typeof d.days==='object' && !Array.isArray(d.days)){
+    for(const k of Object.keys(d.days)){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      const v = d.days[k];
+      if(!v || typeof v!=='object') continue;
+      out.days[k] = {
+        kmStart: Number.isFinite(v.kmStart) ? v.kmStart : null,
+        kmEnd:   Number.isFinite(v.kmEnd)   ? v.kmEnd   : null,
+        openedAt: (typeof v.openedAt==='string' && /^\d{2}:\d{2}$/.test(v.openedAt)) ? v.openedAt : null,
+        closedAt: (typeof v.closedAt==='string' && /^\d{2}:\d{2}$/.test(v.closedAt)) ? v.closedAt : null,
+        rides: Array.isArray(v.rides) ? v.rides
+          .filter(r=>r && typeof r==='object' && isFinite(Number(r.amt)) && Number(r.amt)>0)
+          .map(r=>({
+            id: String(r.id || ('r'+Date.now()+Math.floor(Math.random()*1e6))),
+            t: String(r.t||''),
+            src: String(r.src||''),
+            srcName: String(r.srcName||''),
+            pay: (r.pay==='cash'||r.pay==='sumup') ? r.pay : 'app',
+            amt: Math.round(Number(r.amt)*100)/100,
+            rate: isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate))) : undefined
+          })) : [],
+        charges: Array.isArray(v.charges) ? v.charges
+          .filter(c=>c && typeof c==='object' && isFinite(Number(c.amt)) && Number(c.amt)>0)
+          .map(c=>({
+            id: String(c.id || ('c'+Date.now()+Math.floor(Math.random()*1e6))),
+            label: String(c.label||''),
+            amt: Math.round(Number(c.amt)*100)/100
+          })) : []
+      };
+    }
+  }
+  if(typeof d.activeDay==='string' && out.days[d.activeDay]) out.activeDay = d.activeDay;
+  return out;
+}
+function loadDb(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return freshDb();
+    return normalizeDb(JSON.parse(raw));
+  }catch(e){ return freshDb(); }
+}
+let db = loadDb();
+function saveDb(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); return true; }
+  catch(e){ toast('Erreur de sauvegarde — mémoire pleine ?'); return false; }
+}
+
+/* ============================== ÉTAT UI ============================== */
+const state = { tab:'day', date: todayKey(), src:'uber', pay:'app' };
+
+function dateKeyOf(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function todayKey(){ return dateKeyOf(new Date()); }
+function yesterdayKey(){ const d = new Date(); d.setDate(d.getDate()-1); return dateKeyOf(d); }
+function nowHM(){ const n = new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
+function getDay(key){
+  if(!db.days[key]) db.days[key] = {kmStart:null, kmEnd:null, openedAt:null, closedAt:null, rides:[], charges:[]};
+  return db.days[key];
+}
+function peekDay(key){
+  return db.days[key] || {kmStart:null, kmEnd:null, openedAt:null, closedAt:null, rides:[], charges:[]};
+}
+function dayIsEmpty(d){
+  return (!d.rides || !d.rides.length) && (!d.charges || !d.charges.length)
+    && d.kmStart==null && d.kmEnd==null && d.openedAt==null;
+}
+function pruneEmptyDays(){
+  for(const k of Object.keys(db.days)){
+    if(k===db.activeDay) continue;
+    if(dayIsEmpty(db.days[k])) delete db.days[k];
+  }
+}
+/* État de la journée affichée : 'new' (pas ouverte), 'open' (en cours), 'closed' */
+function dayState(){
+  if(db.activeDay===state.date) return 'open';
+  const d = db.days[state.date];
+  if(d && !dayIsEmpty(d)) return 'closed';
+  return 'new';
+}
+
+/* ============================== HELPERS ============================== */
+const eur = new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'});
+const nf  = new Intl.NumberFormat('fr-BE');
+function fmtEur(n){ return eur.format(n); }
+function parseAmount(s){
+  if(typeof s!=='string') return NaN;
+  let t = s.replace(/[\s  €]/g,'');
+  if(t.includes(',')){
+    if(t.indexOf(',') !== t.lastIndexOf(',')) return NaN;   /* plusieurs virgules : ambigu */
+    t = t.replace(/\./g,'').replace(',','.');               /* "1.234,56" -> "1234.56" */
+  }
+  if(!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return NaN;
+  const v = parseFloat(t);
+  return (isFinite(v) && v>0) ? Math.round(v*100)/100 : NaN;
+}
+function parseKm(s){
+  const t = String(s).replace(/\D/g,'');
+  return t==='' ? null : Math.min(99999999, Number(t));
+}
+function sourceOf(id){ return db.sources.find(s=>s.id===id); }
+function sourceName(id){ const s=sourceOf(id); return s ? s.name : 'Autre'; }
+function rateOf(id){ const s=sourceOf(id); return s ? (Number(s.rate)||0) : 0; }
+/* Le taux est figé sur la course au moment de l'ajout ; repli sur le taux actuel pour les anciennes données */
+function rideRate(r){ return (typeof r.rate==='number' && isFinite(r.rate)) ? r.rate : rateOf(r.src); }
+function rideSrcName(r){ return r.srcName || sourceName(r.src); }
+function rideNet(r){
+  if(r.pay==='app') return r.amt;
+  return Math.round(r.amt * (1 - rideRate(r)/100) * 100)/100;
+}
+const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp'};
+function computeDay(d){
+  const brut = d.rides.reduce((a,r)=>a+r.amt,0);
+  const net  = d.rides.reduce((a,r)=>a+rideNet(r),0);
+  const charges = (d.charges||[]).reduce((a,c)=>a+c.amt,0);
+  let km=null, kmWarn=false;
+  if(d.kmStart!=null && d.kmEnd!=null){
+    if(d.kmEnd >= d.kmStart) km = d.kmEnd - d.kmStart; else kmWarn = true;
+  }
+  const perKm = (km && km>0) ? net/km : null;
+  return {brut, net, charges, km, kmWarn, perKm, count:d.rides.length};
+}
+function longDate(key){
+  const d = new Date(key+'T12:00:00');
+  return d.toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+function shortDate(key){
+  const d = new Date(key+'T12:00:00');
+  return d.toLocaleDateString('fr-BE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+let toastTimer=null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+/* ============================== RENDER ============================== */
+const $ = id => document.getElementById(id);
+function show(id, on){ $(id).classList.toggle('hidden', !on); }
+
+const TRASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
+
+function renderHead(){
+  const open = db.activeDay===state.date;
+  $('headSub').innerHTML = (open?'<span class="livedot" aria-hidden="true"></span>':'')+esc(shortDate(state.date));
+}
+function renderTabs(){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===state.tab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  $('view-'+(state.tab==='day'?'day':state.tab)).classList.add('on');
+}
+function renderDay(){
+  const st = dayState();
+  const d = peekDay(state.date);
+  $('dateInput').value = state.date;
+  $('dateInput').disabled = (st==='open');
+  $('kmStart').value = d.kmStart==null ? '' : nf.format(d.kmStart);
+  $('kmEnd').value   = d.kmEnd==null   ? '' : nf.format(d.kmEnd);
+
+  /* bannière : une autre journée est en cours */
+  const otherOpen = db.activeDay && db.activeDay!==state.date;
+  show('activeBanner', !!otherOpen);
+  if(otherOpen) $('activeBannerTxt').textContent = 'Journée du '+shortDate(db.activeDay)+' en cours — appuyez pour y revenir';
+
+  /* badge d'état + visibilité des sections */
+  const badge = $('stateBadge');
+  show('stateBadge', st!=='new');
+  if(st==='open'){ badge.textContent = 'En cours'+(d.openedAt?' depuis '+d.openedAt:''); badge.className='statebadge open'; }
+  if(st==='closed'){ badge.textContent = 'Clôturée'+(d.closedAt?' à '+d.closedAt:''); badge.className='statebadge closed'; }
+  show('kmEndWrap', st!=='new');
+  show('openDayBtn', st==='new');
+  show('closeDayBtn', st==='open');
+  show('reopenBtn', st==='closed');
+  show('cardCourses', st!=='new');
+  show('cardCharges', st!=='new');
+  show('cardSummary', st!=='new');
+  show('addRideForm', st==='open');
+  show('addChargeForm', st==='open');
+
+  const c = computeDay(d);
+  $('kmRes').innerHTML = c.kmWarn
+    ? '<span class="warn">Attention : le km de fin est plus petit que le km de début.</span>'
+    : (c.km!=null ? 'Kilomètres parcourus : <strong>'+nf.format(c.km)+' km</strong>'
+       : (st==='new' ? 'Indiquez le kilométrage puis ouvrez la journée.' : ''));
+
+  /* chips sources */
+  if(!sourceOf(state.src)) state.src = db.sources.length ? db.sources[0].id : 'uber';
+  $('srcChips').innerHTML = db.sources.map(s=>
+    '<button type="button" role="radio" aria-checked="'+(s.id===state.src)+'" class="chip'+(s.id===state.src?' on':'')+'" data-src="'+esc(s.id)+'">'+esc(s.name)+'</button>'
+  ).join('');
+
+  /* segmented paiement */
+  document.querySelectorAll('#paySeg button').forEach(b=>{
+    const on = b.dataset.pay===state.pay;
+    b.classList.toggle('on', on);
+    b.setAttribute('role','radio');
+    b.setAttribute('aria-checked', on);
+  });
+
+  /* liste des courses */
+  if(!d.rides.length){
+    $('rideList').innerHTML = st==='open'
+      ? '<div class="empty">Aucune course pour le moment.<br>Ajoutez votre première course ci-dessus.</div>'
+      : '<div class="empty">Aucune course.</div>';
+  }else{
+    $('rideList').innerHTML = d.rides.map(r=>{
+      const net = rideNet(r);
+      const diff = r.pay!=='app' && rideRate(r)>0;
+      return '<div class="item">'+
+        '<div class="who"><div class="l1">'+esc(rideSrcName(r))+' <span class="badge '+esc(r.pay)+'">'+PAY_LABEL[r.pay]+'</span></div>'+
+        '<div class="l2">'+(r.t?esc(r.t):'—')+(diff?' · retenue '+nf.format(rideRate(r))+' %':'')+'</div></div>'+
+        '<div class="amt"><div class="net">'+fmtEur(net)+'</div>'+(diff?'<div class="brut">brut '+fmtEur(r.amt)+'</div>':'')+'</div>'+
+        '<button type="button" class="icon-btn danger" data-del-ride="'+esc(r.id)+'" aria-label="Supprimer cette course">'+TRASH+'</button>'+
+      '</div>';
+    }).join('');
+  }
+
+  /* charges */
+  if(!(d.charges||[]).length){
+    $('chargeList').innerHTML = '';
+  }else{
+    $('chargeList').innerHTML = d.charges.map(ch=>
+      '<div class="item"><div class="who"><div class="l1">'+esc(ch.label||'Charge')+'</div></div>'+
+      '<div class="amt"><div class="net">'+fmtEur(ch.amt)+'</div></div>'+
+      '<button type="button" class="icon-btn danger" data-del-charge="'+esc(ch.id)+'" aria-label="Supprimer cette charge">'+TRASH+'</button></div>'
+    ).join('');
+  }
+
+  /* résumé */
+  let g = '';
+  g += '<div class="stat"><div class="k">Kilomètres</div><div class="v">'+(c.km!=null?nf.format(c.km)+' km':'—')+'</div></div>';
+  g += '<div class="stat"><div class="k">Courses</div><div class="v">'+c.count+'</div></div>';
+  g += '<div class="stat"><div class="k">Total brut</div><div class="v">'+fmtEur(c.brut)+'</div></div>';
+  g += '<div class="stat"><div class="k">Total net</div><div class="v acc">'+fmtEur(c.net)+'</div></div>';
+  g += '<div class="stat wide"><div class="k">Rendement</div><div class="v">'+(c.perKm!=null?nf.format(Math.round(c.perKm*100)/100)+' €/km':'—')+'</div></div>';
+  if(c.charges>0){
+    g += '<div class="stat wide"><div class="k">Charges</div><div class="v">'+fmtEur(c.charges)+'</div></div>';
+    g += '<div class="stat wide"><div class="k">Net − charges</div><div class="v acc">'+fmtEur(c.net-c.charges)+'</div></div>';
+  }
+  $('sumGrid').innerHTML = g;
+  renderHead();
+}
+function renderHistory(){
+  pruneEmptyDays();
+  const keys = Object.keys(db.days).sort().reverse();
+  if(!keys.length){
+    $('histList').innerHTML = '<div class="card"><div class="empty">Aucune journée enregistrée pour le moment.</div></div>';
+    return;
+  }
+  $('histList').innerHTML = keys.map(k=>{
+    const c = computeDay(db.days[k]);
+    const enCours = k===db.activeDay;
+    return '<button type="button" class="hist" data-open-day="'+esc(k)+'">'+
+      '<div class="d"><div class="l1">'+longDate(k)+'</div>'+
+      '<div class="l2">'+c.count+' course'+(c.count>1?'s':'')+(c.km!=null?' · '+nf.format(c.km)+' km':'')+' · brut '+fmtEur(c.brut)+'</div></div>'+
+      '<div class="n"><div class="net">'+fmtEur(c.net)+'</div><div class="lbl'+(enCours?' encours':'')+'">'+(enCours?'en cours':'net')+'</div></div>'+
+    '</button>';
+  }).join('');
+}
+function renderSettings(){
+  $('srcSettings').innerHTML = db.sources.map(s=>
+    '<div class="src-row"><div class="nm">'+esc(s.name)+'</div>'+
+    '<input type="text" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
+    '<span class="pct">%</span>'+
+    (s.builtin ? '' : '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>')+
+    '</div>'
+  ).join('');
+}
+function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); }
+
+/* ============================== ÉVÉNEMENTS ============================== */
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click', ()=>{ state.tab = b.dataset.tab; renderTabs(); if(state.tab==='history') renderHistory(); window.scrollTo({top:0}); });
+});
+$('dateInput').addEventListener('change', e=>{
+  const v = e.target.value;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)){ pruneEmptyDays(); state.date = v; renderDay(); }
+  else { e.target.value = state.date; }
+});
+$('activeBanner').addEventListener('click', ()=>{
+  if(db.activeDay){ state.date = db.activeDay; renderDay(); window.scrollTo({top:0}); }
+});
+function bindKm(id, field){
+  $(id).addEventListener('change', e=>{
+    const v = parseKm(e.target.value);
+    if(v==null && dayState()==='new' && !db.days[state.date]){ e.target.value=''; return; }
+    const d = getDay(state.date);
+    d[field] = v;
+    saveDb(); renderDay();
+  });
+}
+bindKm('kmStart','kmStart');
+bindKm('kmEnd','kmEnd');
+
+/* --------- ouvrir / clôturer / rouvrir la journée --------- */
+$('openDayBtn').addEventListener('click', ()=>{
+  const km = parseKm($('kmStart').value);
+  if(km==null){ toast('Indiquez d’abord le kilométrage de départ'); $('kmStart').focus(); return; }
+  if(db.activeDay && db.activeDay!==state.date){
+    toast('Clôturez d’abord la journée du '+shortDate(db.activeDay));
+    return;
+  }
+  const d = getDay(state.date);
+  d.kmStart = km;
+  if(!d.openedAt) d.openedAt = nowHM();
+  d.closedAt = null;
+  db.activeDay = state.date;
+  saveDb(); renderDay(); renderHistory();
+  toast('Journée ouverte — bonne route !');
+});
+$('closeDayBtn').addEventListener('click', ()=>{
+  const d = getDay(state.date);
+  const km = parseKm($('kmEnd').value);
+  if(km==null){ toast('Indiquez le kilométrage de fin pour clôturer'); $('kmEnd').focus(); return; }
+  if(d.kmStart!=null && km < d.kmStart){ toast('Le km de fin doit être plus grand que le km de début'); $('kmEnd').focus(); return; }
+  if(!confirm('Clôturer la journée ?')) return;
+  d.kmEnd = km;
+  d.closedAt = nowHM();
+  db.activeDay = null;
+  saveDb(); renderDay(); renderHistory();
+  const c = computeDay(d);
+  toast('Journée clôturée — net '+fmtEur(c.net));
+});
+$('reopenBtn').addEventListener('click', ()=>{
+  if(db.activeDay && db.activeDay!==state.date){
+    toast('Clôturez d’abord la journée du '+shortDate(db.activeDay));
+    return;
+  }
+  const d = getDay(state.date);
+  if(!d.openedAt) d.openedAt = nowHM();
+  d.closedAt = null;
+  db.activeDay = state.date;
+  saveDb(); renderDay(); renderHistory();
+  toast('Journée rouverte');
+});
+
+$('srcChips').addEventListener('click', e=>{
+  const b = e.target.closest('[data-src]');
+  if(b){ state.src = b.dataset.src; renderDay(); }
+});
+$('paySeg').addEventListener('click', e=>{
+  const b = e.target.closest('[data-pay]');
+  if(b){ state.pay = b.dataset.pay; renderDay(); }
+});
+$('addRide').addEventListener('click', ()=>{
+  const amt = parseAmount($('amount').value);
+  if(isNaN(amt)){ toast('Entrez un montant valide (ex : 42,96)'); $('amount').focus(); return; }
+  const d = getDay(state.date);
+  /* heure réelle seulement si la course est ajoutée le jour même (ou pendant une session ouverte qui passe minuit) */
+  const stampTime = state.date===todayKey() || (db.activeDay===state.date && state.date===yesterdayKey());
+  d.rides.push({
+    id: 'r'+Date.now()+Math.floor(Math.random()*1000),
+    t: stampTime ? nowHM() : '',
+    src: state.src,
+    srcName: sourceName(state.src),
+    pay: state.pay,
+    amt,
+    rate: state.pay==='app' ? 0 : rateOf(state.src)
+  });
+  const ok = saveDb();
+  $('amount').value='';
+  renderDay();
+  if(ok) toast('Course '+sourceName(state.src)+' ajoutée — '+fmtEur(amt));
+});
+$('amount').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRide').click(); } });
+
+$('rideList').addEventListener('click', e=>{
+  const b = e.target.closest('[data-del-ride]');
+  if(!b) return;
+  if(!confirm('Supprimer cette course ?')) return;
+  const d = getDay(state.date);
+  d.rides = d.rides.filter(r=>r.id!==b.dataset.delRide);
+  saveDb(); renderDay();
+});
+$('addCharge').addEventListener('click', ()=>{
+  const amt = parseAmount($('chargeAmt').value);
+  if(isNaN(amt)){ toast('Entrez un montant de charge valide'); $('chargeAmt').focus(); return; }
+  const d = getDay(state.date);
+  if(!d.charges) d.charges=[];
+  d.charges.push({id:'c'+Date.now()+Math.floor(Math.random()*1000), label: $('chargeLabel').value.trim(), amt});
+  const ok = saveDb();
+  $('chargeLabel').value=''; $('chargeAmt').value='';
+  renderDay();
+  if(ok) toast('Charge ajoutée — '+fmtEur(amt));
+});
+$('chargeList').addEventListener('click', e=>{
+  const b = e.target.closest('[data-del-charge]');
+  if(!b) return;
+  if(!confirm('Supprimer cette charge ?')) return;
+  const d = getDay(state.date);
+  d.charges = (d.charges||[]).filter(c=>c.id!==b.dataset.delCharge);
+  saveDb(); renderDay();
+});
+$('histList').addEventListener('click', e=>{
+  const b = e.target.closest('[data-open-day]');
+  if(!b) return;
+  state.date = b.dataset.openDay;
+  state.tab = 'day';
+  renderTabs(); renderDay();
+  window.scrollTo({top:0});
+});
+$('srcSettings').addEventListener('change', e=>{
+  const inp = e.target.closest('[data-rate]');
+  if(!inp) return;
+  const s = sourceOf(inp.dataset.rate);
+  if(!s) return;
+  const raw = String(inp.value).trim();
+  const v = Number(raw.replace(',','.'));
+  if(raw==='' || !isFinite(v)){
+    inp.value = s.rate;
+    toast(s.name+' : valeur invalide — retenue inchangée ('+nf.format(s.rate)+' %)');
+    return;
+  }
+  s.rate = Math.min(100, Math.max(0, v));
+  inp.value = s.rate;
+  const ok = saveDb(); renderDay();
+  if(ok) toast(s.name+' : retenue '+nf.format(s.rate)+' % (courses futures)');
+});
+$('srcSettings').addEventListener('click', e=>{
+  const b = e.target.closest('[data-del-src]');
+  if(!b) return;
+  const s = sourceOf(b.dataset.delSrc);
+  if(!s) return;
+  if(!confirm('Supprimer la source « '+s.name+' » ? Les anciennes courses garderont leur montant et leur nom.')) return;
+  db.sources = db.sources.filter(x=>x.id!==s.id);
+  if(state.src===s.id) state.src = db.sources.length ? db.sources[0].id : 'uber';
+  saveDb(); renderAll();
+});
+$('addSrcBtn').addEventListener('click', ()=>{
+  const name = $('newSrcName').value.trim();
+  if(!name){ toast('Donnez un nom à la source'); $('newSrcName').focus(); return; }
+  let rate = Number(String($('newSrcRate').value).trim().replace(',','.'));
+  if(!isFinite(rate)) rate = 0;
+  rate = Math.min(100, Math.max(0, rate));
+  db.sources.push({id:'c'+Date.now(), name, rate, builtin:false});
+  const ok = saveDb();
+  $('newSrcName').value=''; $('newSrcRate').value='';
+  renderAll();
+  if(ok) toast('Source « '+name+' » ajoutée ('+nf.format(rate)+' %)');
+});
+
+/* ---------- téléchargement (feuille de partage iOS d'abord, lien sinon) ---------- */
+async function download(filename, blob){
+  try{
+    const file = new File([blob], filename, {type: blob.type});
+    if(navigator.canShare && navigator.canShare({files:[file]}) && navigator.share){
+      try{ await navigator.share({files:[file]}); return true; }
+      catch(err){
+        if(err && err.name==='AbortError') return false; /* annulé par l'utilisateur */
+        /* autre erreur : on retombe sur le lien classique */
+      }
+    }
+  }catch(e){ /* File non supporté : lien classique */ }
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 60000);
+  return true;
+}
+$('exportBtn').addEventListener('click', ()=>{
+  pruneEmptyDays();
+  download('taxi-donnees-'+todayKey()+'.json', new Blob([JSON.stringify(db,null,2)],{type:'application/json'}))
+    .then(ok=>{ if(ok) toast('Sauvegarde prête'); });
+});
+$('importBtn').addEventListener('click', ()=>$('importFile').click());
+$('importFile').addEventListener('change', e=>{
+  const f = e.target.files && e.target.files[0];
+  e.target.value='';
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onerror = ()=>toast('Impossible de lire le fichier');
+  reader.onload = ()=>{
+    try{
+      const raw = JSON.parse(reader.result);
+      if(!raw || typeof raw!=='object' || !Array.isArray(raw.sources) || !raw.days || typeof raw.days!=='object' || Array.isArray(raw.days)) throw new Error('format');
+      if(!confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) return;
+      db = normalizeDb(raw);
+      state.date = db.activeDay || todayKey();
+      const ok = saveDb(); renderAll();
+      if(ok) toast('Sauvegarde importée');
+    }catch(err){ toast('Fichier de sauvegarde invalide'); }
+  };
+  reader.readAsText(f);
+});
+
+/* ============================== PDF ============================== */
+const CP1252 = {0x20AC:128,0x201A:130,0x0192:131,0x201E:132,0x2026:133,0x2020:134,0x2021:135,0x02C6:136,0x2030:137,0x0160:138,0x2039:139,0x0152:140,0x017D:142,0x2018:145,0x2019:146,0x201C:147,0x201D:148,0x2022:149,0x2013:150,0x2014:151,0x02DC:152,0x2122:153,0x0161:154,0x203A:155,0x0153:156,0x017E:158,0x0178:159};
+function pdfStr(s){
+  let out='';
+  for(const ch of String(s)){
+    let c = ch.codePointAt(0);
+    if(c===0x00A0 || c===0x202F || c===0x2009) c = 32; /* espaces insécables -> espace */
+    else if(c>127 && CP1252[c]!==undefined) c = CP1252[c];
+    else if(c>255) c = 63; /* ? */
+    const b = String.fromCharCode(c);
+    out += (b==='\\'||b==='('||b===')') ? '\\'+b : b;
+  }
+  return out;
+}
+function eurPdf(n){
+  const v = (Math.round(n*100)/100).toFixed(2).replace('.',',');
+  return v.replace(/\B(?=(\d{3})+(?=,))/g,' ')+' €';
+}
+function makePdf(dateKey, day){
+  const W=595.28, H=841.89, M=40;
+  const c = computeDay(day);
+  const pages=[]; let ops=[];
+  let y = H - 100;
+  function newPage(){ ops=[]; pages.push(ops); y = H - 60; }
+  function needs(h){ if(y - h < 50){ newPage(); } }
+  function text(x, yy, str, size, bold, gray){
+    const col = gray ? '0.42 0.47 0.55 rg' : '0.06 0.09 0.16 rg';
+    ops.push(col+' BT /'+(bold?'F2':'F1')+' '+size+' Tf '+x.toFixed(2)+' '+yy.toFixed(2)+' Td ('+pdfStr(str)+') Tj ET');
+  }
+  function textW(x, yy, str, size, bold){
+    ops.push('1 1 1 rg BT /'+(bold?'F2':'F1')+' '+size+' Tf '+x.toFixed(2)+' '+yy.toFixed(2)+' Td ('+pdfStr(str)+') Tj ET');
+  }
+  function rect(x, yy, w, h, r, g, b){
+    ops.push(r+' '+g+' '+b+' rg '+x.toFixed(2)+' '+yy.toFixed(2)+' '+w.toFixed(2)+' '+h.toFixed(2)+' re f');
+  }
+  function hline(yy){
+    ops.push('0.88 0.90 0.93 RG 0.7 w '+M+' '+yy.toFixed(2)+' m '+(W-M)+' '+yy.toFixed(2)+' l S');
+  }
+  function section(title){
+    needs(34);
+    text(M, y, title.toUpperCase(), 10.5, true, true);
+    y -= 8; hline(y); y -= 16;
+  }
+
+  /* page 1 : bandeau */
+  newPage();
+  rect(0, H-78, W, 78, 0.118, 0.227, 0.373);
+  textW(M, H-40, 'Rapport journalier - Taxi', 19, true);
+  const dLong = longDate(dateKey);
+  textW(M, H-60, dLong.charAt(0).toUpperCase()+dLong.slice(1), 11.5, false);
+  y = H - 108;
+
+  /* kilométrage + horaires de service */
+  section('Kilométrage');
+  const kmS = day.kmStart!=null ? nf.format(day.kmStart)+' km' : '—';
+  const kmE = day.kmEnd!=null ? nf.format(day.kmEnd)+' km' : '—';
+  text(M, y, 'Début : '+kmS, 11, false);
+  text(M+170, y, 'Fin : '+kmE, 11, false);
+  text(M+340, y, 'Parcourus : '+(c.km!=null? nf.format(c.km)+' km' : '—'), 11, true);
+  y -= 18;
+  if(day.openedAt){
+    text(M, y, 'Service : ouvert à '+day.openedAt+(day.closedAt ? ' - clôturé à '+day.closedAt : ' (en cours)'), 10, false, true);
+    y -= 18;
+  }
+  y -= 8;
+
+  /* courses */
+  section('Courses ('+c.count+')');
+  const X = {n:M, h:M+28, s:M+70, p:M+205, m:M+330, net:M+435};
+  function tableHead(){
+    text(X.n, y, 'N°', 9.5, true, true);
+    text(X.h, y, 'Heure', 9.5, true, true);
+    text(X.s, y, 'Source', 9.5, true, true);
+    text(X.p, y, 'Paiement', 9.5, true, true);
+    text(X.m, y, 'Montant', 9.5, true, true);
+    text(X.net, y, 'Net', 9.5, true, true);
+    y -= 6; hline(y); y -= 13;
+  }
+  if(!day.rides.length){
+    text(M, y, 'Aucune course enregistrée.', 11, false, true);
+    y -= 22;
+  }else{
+    tableHead();
+    day.rides.forEach((r,i)=>{
+      if(y < 70){ newPage(); tableHead(); }
+      const net = rideNet(r);
+      text(X.n, y, String(i+1), 10, false);
+      text(X.h, y, r.t || '—', 10, false);
+      text(X.s, y, rideSrcName(r), 10, false);
+      text(X.p, y, PAY_LABEL[r.pay] + (r.pay!=='app' && rideRate(r)>0 ? ' (-'+nf.format(rideRate(r))+' %)' : ''), 10, false);
+      text(X.m, y, eurPdf(r.amt), 10, false);
+      text(X.net, y, eurPdf(net), 10, true);
+      y -= 16;
+    });
+    y -= 6;
+  }
+
+  /* charges */
+  if((day.charges||[]).length){
+    section('Charges');
+    day.charges.forEach(ch=>{
+      if(y < 70) newPage();
+      text(M, y, ch.label || 'Charge', 10, false);
+      text(X.net, y, eurPdf(ch.amt), 10, false);
+      y -= 15;
+    });
+    y -= 6;
+  }
+
+  /* résumé */
+  needs(150);
+  section('Résumé');
+  const rows = [
+    ['Kilomètres parcourus', c.km!=null ? nf.format(c.km)+' km' : '—', false],
+    ['Total brut', eurPdf(c.brut), false],
+    ['Total net', eurPdf(c.net), true],
+    ['Rendement', c.perKm!=null ? nf.format(Math.round(c.perKm*100)/100)+' €/km' : '—', false],
+  ];
+  if(c.charges>0){
+    rows.push(['Charges', eurPdf(c.charges), false]);
+    rows.push(['Net - charges', eurPdf(c.net-c.charges), true]);
+  }
+  rows.forEach(([k,v,strong])=>{
+    if(y < 70) newPage();
+    text(M, y, k, 11, false, !strong);
+    text(X.net-60, y, v, strong?12:11, strong);
+    y -= 18;
+  });
+  y -= 8;
+  if(y < 60) newPage();
+  text(M, 34, 'Généré par Taxi Recettes le '+new Date().toLocaleDateString('fr-BE')+' à '+new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'}), 8.5, false, true);
+
+  /* -------- assemblage du fichier PDF -------- */
+  const objs = [];
+  const kidsIds = [];
+  const nPages = pages.length;
+  pages.forEach((p,i)=>{ kidsIds.push(5 + i*2); });
+  objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+  objs.push('<< /Type /Pages /Kids ['+kidsIds.map(id=>id+' 0 R').join(' ')+'] /Count '+nPages+' >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  pages.forEach((p,i)=>{
+    const contentId = 5 + i*2 + 1;
+    objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+contentId+' 0 R >>');
+    const stream = p.join('\n');
+    objs.push('<< /Length '+stream.length+' >>\nstream\n'+stream+'\nendstream');
+  });
+  let out = '%PDF-1.4\n';
+  const offsets = [0];
+  objs.forEach((o,i)=>{
+    offsets.push(out.length);
+    out += (i+1)+' 0 obj\n'+o+'\nendobj\n';
+  });
+  const xrefPos = out.length;
+  out += 'xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
+  for(let i=1;i<=objs.length;i++){
+    out += String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+  }
+  out += 'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R >>\nstartxref\n'+xrefPos+'\n%%EOF';
+  const bytes = new Uint8Array(out.length);
+  for(let i=0;i<out.length;i++) bytes[i] = out.charCodeAt(i) & 0xFF;
+  return new Blob([bytes], {type:'application/pdf'});
+}
+$('pdfBtn').addEventListener('click', ()=>{
+  const day = peekDay(state.date);
+  if(dayIsEmpty(day)){ toast('Rien à exporter pour cette journée'); return; }
+  download('rapport-taxi-'+state.date+'.pdf', makePdf(state.date, day))
+    .then(ok=>{ if(ok) toast('PDF prêt'); });
+});
+
+/* ============================== INIT ============================== */
+if(db.activeDay && db.days[db.activeDay]) state.date = db.activeDay;
+try{ renderAll(); }
+catch(e){
+  try{ localStorage.setItem(STORE_KEY+'_corrompu', localStorage.getItem(STORE_KEY)||''); }catch(_){ }
+  db = freshDb(); saveDb(); renderAll();
+  toast('Données corrompues détectées — application réinitialisée (copie conservée)');
+}
+</script>
+</body>
+</html>
