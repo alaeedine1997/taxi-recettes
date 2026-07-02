@@ -81,7 +81,7 @@ input:disabled{opacity:.55}
 .chip:active{transform:scale(.96)}
 .chip.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
 /* segmented */
-.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--chip-bg);border-radius:12px;padding:4px;gap:4px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--chip-bg);border-radius:12px;padding:4px;gap:4px}
 .seg button{
   border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:600;
   padding:10px 4px;border-radius:9px;cursor:pointer;min-height:44px;transition:background .15s,color .15s;
@@ -113,8 +113,9 @@ input:disabled{opacity:.55}
 .badge.app{background:rgba(37,99,235,.12);color:#2563EB}
 .badge.cash{background:rgba(217,119,6,.14);color:#B45309}
 .badge.sumup{background:rgba(5,150,105,.13);color:var(--accent)}
+.badge.cheque{background:rgba(124,58,237,.13);color:#7C3AED}
 @media (prefers-color-scheme: dark){
-  .badge.app{color:#7FA8F5}.badge.cash{color:#E5A34D}
+  .badge.app{color:#7FA8F5}.badge.cash{color:#E5A34D}.badge.cheque{color:#A78BFA}
 }
 .item .amt{text-align:right;font-variant-numeric:tabular-nums}
 .item .amt .net{font-weight:700;font-size:16px}
@@ -247,6 +248,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
         <button type="button" data-pay="app">App / Facturé</button>
         <button type="button" data-pay="cash">Cash</button>
         <button type="button" data-pay="sumup">SumUp</button>
+        <button type="button" data-pay="cheque">Chèque taxi</button>
       </div>
       <div class="amount-row">
         <input type="text" id="amount" inputmode="decimal" placeholder="Montant € — ex : 42,96" aria-label="Montant de la course en euros">
@@ -299,7 +301,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   <div class="card">
     <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Sources &amp; retenues</h2>
     <div id="srcSettings"></div>
-    <div class="note">La retenue s'applique uniquement aux courses payées en <strong>cash</strong> ou <strong>SumUp</strong>. Les courses payées par l'app ou facturées sont enregistrées en net (retenue 0). Modifier un taux ne change pas les anciennes courses.</div>
+    <div class="note">La retenue s'applique uniquement aux courses payées en <strong>cash</strong>, <strong>SumUp</strong> ou <strong>chèque taxi</strong>. Les courses payées par l'app ou facturées sont enregistrées en net (retenue 0). Modifier un taux ne change pas les anciennes courses.</div>
   </div>
 
   <div class="card">
@@ -385,7 +387,7 @@ function normalizeDb(d){
             t: String(r.t||''),
             src: String(r.src||''),
             srcName: String(r.srcName||''),
-            pay: (r.pay==='cash'||r.pay==='sumup') ? r.pay : 'app',
+            pay: (r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque') ? r.pay : 'app',
             amt: Math.round(Number(r.amt)*100)/100,
             rate: isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate))) : undefined
           })) : [],
@@ -478,7 +480,7 @@ function rideNet(r){
   if(r.pay==='app') return r.amt;
   return Math.round(r.amt * (1 - rideRate(r)/100) * 100)/100;
 }
-const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp'};
+const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi'};
 function computeDay(d){
   const brut = d.rides.reduce((a,r)=>a+r.amt,0);
   const net  = d.rides.reduce((a,r)=>a+rideNet(r),0);
