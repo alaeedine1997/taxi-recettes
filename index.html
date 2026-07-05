@@ -145,6 +145,8 @@ input:disabled{opacity:.55}
 .hist .n .net{font-weight:800;font-size:17px;color:var(--accent);font-variant-numeric:tabular-nums}
 .hist .n .lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
 .hist .n .lbl.encours{color:var(--accent)}
+.monthnav{display:flex;align-items:center;gap:8px}
+.monthnav .monthlabel{flex:1;text-align:center;font-weight:800;font-size:17px;text-transform:capitalize}
 /* settings */
 .src-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .src-row:last-child{border-bottom:none}
@@ -287,10 +289,23 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 
 </section>
 
-<!-- ===================== HISTORIQUE ===================== -->
+<!-- ===================== HISTORIQUE / MOIS ===================== -->
 <section class="view" id="view-history">
-  <div class="card" style="background:transparent;border:none;box-shadow:none;padding:16px 2px 0">
-    <h2 style="margin-bottom:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Journées enregistrées</h2>
+  <div class="card">
+    <div class="monthnav">
+      <button type="button" class="icon-btn" id="prevMonth" aria-label="Mois précédent">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="monthlabel" id="monthLabel"></div>
+      <button type="button" class="icon-btn" id="nextMonth" aria-label="Mois suivant">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <div class="sumgrid" id="monthGrid" style="margin-top:12px"></div>
+    <button type="button" class="btn btn-primary btn-full" id="monthPdfBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+      Télécharger le PDF du mois
+    </button>
   </div>
   <div class="list" id="histList" style="margin-top:10px"></div>
 </section>
@@ -418,7 +433,7 @@ function saveDb(){
 }
 
 /* ============================== ÉTAT UI ============================== */
-const state = { tab:'day', date: todayKey(), src:'uber', pay:'app' };
+const state = { tab:'day', date: todayKey(), src:'uber', pay:'app', histMonth: todayKey().slice(0,7) };
 
 function dateKeyOf(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -491,6 +506,22 @@ function computeDay(d){
   }
   const perKm = (km && km>0) ? net/km : null;
   return {brut, net, charges, km, kmWarn, perKm, count:d.rides.length};
+}
+function monthDays(mk){ return Object.keys(db.days).filter(k=>k.startsWith(mk+'-')).sort(); }
+function computeMonth(mk){
+  const keys = monthDays(mk);
+  let brut=0, net=0, charges=0, km=0, count=0;
+  keys.forEach(k=>{
+    const c = computeDay(db.days[k]);
+    brut+=c.brut; net+=c.net; charges+=c.charges; count+=c.count;
+    if(c.km) km+=c.km;
+  });
+  return {brut, net, charges, km, count, days:keys.length, perKm: km>0 ? net/km : null, keys};
+}
+function monthName(mk){
+  const d = new Date(mk+'-15T12:00:00');
+  const s = d.toLocaleDateString('fr-BE',{month:'long',year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
 }
 function longDate(key){
   const d = new Date(key+'T12:00:00');
@@ -618,9 +649,27 @@ function renderDay(){
 }
 function renderHistory(){
   pruneEmptyDays();
-  const keys = Object.keys(db.days).sort().reverse();
+  const mk = state.histMonth;
+  $('monthLabel').textContent = monthName(mk);
+  const m = computeMonth(mk);
+
+  /* totaux du mois */
+  let g = '';
+  g += '<div class="stat"><div class="k">Jours travaillés</div><div class="v">'+m.days+'</div></div>';
+  g += '<div class="stat"><div class="k">Courses</div><div class="v">'+m.count+'</div></div>';
+  g += '<div class="stat"><div class="k">Kilomètres</div><div class="v">'+(m.km>0?nf.format(m.km)+' km':'—')+'</div></div>';
+  g += '<div class="stat"><div class="k">Rendement</div><div class="v">'+(m.perKm!=null?nf.format(Math.round(m.perKm*100)/100)+' €/km':'—')+'</div></div>';
+  g += '<div class="stat"><div class="k">Total brut</div><div class="v">'+fmtEur(m.brut)+'</div></div>';
+  g += '<div class="stat"><div class="k">Total net</div><div class="v acc">'+fmtEur(m.net)+'</div></div>';
+  if(m.charges>0){
+    g += '<div class="stat wide"><div class="k">Charges</div><div class="v">'+fmtEur(m.charges)+'</div></div>';
+    g += '<div class="stat wide"><div class="k">Net − charges</div><div class="v acc">'+fmtEur(m.net-m.charges)+'</div></div>';
+  }
+  $('monthGrid').innerHTML = g;
+
+  const keys = m.keys.slice().reverse();
   if(!keys.length){
-    $('histList').innerHTML = '<div class="card"><div class="empty">Aucune journée enregistrée pour le moment.</div></div>';
+    $('histList').innerHTML = '<div class="card"><div class="empty">Aucune journée enregistrée pour '+esc(monthName(mk))+'.</div></div>';
     return;
   }
   $('histList').innerHTML = keys.map(k=>{
@@ -774,6 +823,20 @@ $('histList').addEventListener('click', e=>{
   state.tab = 'day';
   renderTabs(); renderDay();
   window.scrollTo({top:0});
+});
+function shiftMonth(delta){
+  const parts = state.histMonth.split('-').map(Number);
+  const d = new Date(parts[0], parts[1]-1+delta, 15);
+  state.histMonth = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  renderHistory();
+}
+$('prevMonth').addEventListener('click', ()=>shiftMonth(-1));
+$('nextMonth').addEventListener('click', ()=>shiftMonth(1));
+$('monthPdfBtn').addEventListener('click', ()=>{
+  const m = computeMonth(state.histMonth);
+  if(!m.days){ toast('Aucune journée pour '+monthName(state.histMonth)); return; }
+  download('rapport-taxi-mois-'+state.histMonth+'.pdf', makeMonthPdf(state.histMonth))
+    .then(ok=>{ if(ok) toast('PDF du mois prêt'); });
 });
 $('srcSettings').addEventListener('change', e=>{
   const inp = e.target.closest('[data-rate]');
@@ -994,7 +1057,12 @@ function makePdf(dateKey, day){
   if(y < 60) newPage();
   text(M, 34, 'Généré par Taxi Recettes le '+new Date().toLocaleDateString('fr-BE')+' à '+new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'}), 8.5, false, true);
 
-  /* -------- assemblage du fichier PDF -------- */
+  return assemblePdf(pages);
+}
+
+/* Assemble les pages (listes d'opérations) en un fichier PDF valide */
+function assemblePdf(pages){
+  const W=595.28, H=841.89;
   const objs = [];
   const kidsIds = [];
   const nPages = pages.length;
@@ -1024,6 +1092,97 @@ function makePdf(dateKey, day){
   const bytes = new Uint8Array(out.length);
   for(let i=0;i<out.length;i++) bytes[i] = out.charCodeAt(i) & 0xFF;
   return new Blob([bytes], {type:'application/pdf'});
+}
+
+/* Rapport mensuel : une ligne par journée + totaux */
+function makeMonthPdf(mk){
+  const W=595.28, H=841.89, M=40;
+  const m = computeMonth(mk);
+  const pages=[]; let ops=[];
+  let y = H - 100;
+  function newPage(){ ops=[]; pages.push(ops); y = H - 60; }
+  function needs(h){ if(y - h < 50){ newPage(); } }
+  function text(x, yy, str, size, bold, gray){
+    const col = gray ? '0.42 0.47 0.55 rg' : '0.06 0.09 0.16 rg';
+    ops.push(col+' BT /'+(bold?'F2':'F1')+' '+size+' Tf '+x.toFixed(2)+' '+yy.toFixed(2)+' Td ('+pdfStr(str)+') Tj ET');
+  }
+  function textW(x, yy, str, size, bold){
+    ops.push('1 1 1 rg BT /'+(bold?'F2':'F1')+' '+size+' Tf '+x.toFixed(2)+' '+yy.toFixed(2)+' Td ('+pdfStr(str)+') Tj ET');
+  }
+  function rect(x, yy, w, h, r, g, b){
+    ops.push(r+' '+g+' '+b+' rg '+x.toFixed(2)+' '+yy.toFixed(2)+' '+w.toFixed(2)+' '+h.toFixed(2)+' re f');
+  }
+  function hline(yy){
+    ops.push('0.88 0.90 0.93 RG 0.7 w '+M+' '+yy.toFixed(2)+' m '+(W-M)+' '+yy.toFixed(2)+' l S');
+  }
+  function section(title){
+    needs(34);
+    text(M, y, title.toUpperCase(), 10.5, true, true);
+    y -= 8; hline(y); y -= 16;
+  }
+
+  newPage();
+  rect(0, H-78, W, 78, 0.118, 0.227, 0.373);
+  textW(M, H-40, 'Rapport mensuel - Taxi', 19, true);
+  textW(M, H-60, monthName(mk), 11.5, false);
+  y = H - 108;
+
+  section('Journées ('+m.days+')');
+  const X = {d:M, c:M+120, km:M+180, b:M+250, n:M+345, ch:M+440};
+  function tableHead(){
+    text(X.d, y, 'Date', 9.5, true, true);
+    text(X.c, y, 'Courses', 9.5, true, true);
+    text(X.km, y, 'Km', 9.5, true, true);
+    text(X.b, y, 'Brut', 9.5, true, true);
+    text(X.n, y, 'Net', 9.5, true, true);
+    text(X.ch, y, 'Charges', 9.5, true, true);
+    y -= 6; hline(y); y -= 13;
+  }
+  tableHead();
+  m.keys.forEach(k=>{
+    if(y < 80){ newPage(); tableHead(); }
+    const c = computeDay(db.days[k]);
+    text(X.d, y, shortDate(k), 10, false);
+    text(X.c, y, String(c.count), 10, false);
+    text(X.km, y, c.km!=null ? nf.format(c.km) : '—', 10, false);
+    text(X.b, y, eurPdf(c.brut), 10, false);
+    text(X.n, y, eurPdf(c.net), 10, true);
+    text(X.ch, y, c.charges>0 ? eurPdf(c.charges) : '—', 10, false);
+    y -= 16;
+  });
+  y -= 2; hline(y+8);
+  if(y < 80){ newPage(); }
+  text(X.d, y, 'TOTAL', 10, true);
+  text(X.c, y, String(m.count), 10, true);
+  text(X.km, y, m.km>0 ? nf.format(m.km) : '—', 10, true);
+  text(X.b, y, eurPdf(m.brut), 10, true);
+  text(X.n, y, eurPdf(m.net), 10, true);
+  text(X.ch, y, m.charges>0 ? eurPdf(m.charges) : '—', 10, true);
+  y -= 28;
+
+  needs(170);
+  section('Résumé du mois');
+  const rows = [
+    ['Jours travaillés', String(m.days), false],
+    ['Kilomètres parcourus', m.km>0 ? nf.format(m.km)+' km' : '—', false],
+    ['Total brut', eurPdf(m.brut), false],
+    ['Total net', eurPdf(m.net), true],
+    ['Rendement', m.perKm!=null ? nf.format(Math.round(m.perKm*100)/100)+' €/km' : '—', false],
+  ];
+  if(m.charges>0){
+    rows.push(['Charges', eurPdf(m.charges), false]);
+    rows.push(['Net - charges', eurPdf(m.net-m.charges), true]);
+  }
+  rows.forEach(([k,v,strong])=>{
+    if(y < 70) newPage();
+    text(M, y, k, 11, false, !strong);
+    text(M+375, y, v, strong?12:11, strong);
+    y -= 18;
+  });
+  if(y < 60) newPage();
+  text(M, 34, 'Généré par Taxi Recettes le '+new Date().toLocaleDateString('fr-BE')+' à '+new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'}), 8.5, false, true);
+
+  return assemblePdf(pages);
 }
 $('pdfBtn').addEventListener('click', ()=>{
   const day = peekDay(state.date);
