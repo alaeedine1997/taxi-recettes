@@ -147,6 +147,8 @@ input:disabled{opacity:.55}
 .hist .n .lbl.encours{color:var(--accent)}
 .monthnav{display:flex;align-items:center;gap:8px}
 .monthnav .monthlabel{flex:1;text-align:center;font-weight:800;font-size:17px;text-transform:capitalize}
+.bysrc-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
+.bysrc-list{display:flex;flex-direction:column;gap:8px}
 /* settings */
 .src-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .src-row:last-child{border-bottom:none}
@@ -302,6 +304,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       </button>
     </div>
     <div class="sumgrid" id="monthGrid" style="margin-top:12px"></div>
+    <div id="monthBySrc"></div>
     <button type="button" class="btn btn-primary btn-full" id="monthPdfBtn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
       Télécharger le PDF du mois
@@ -518,6 +521,18 @@ function computeMonth(mk){
   });
   return {brut, net, charges, km, count, days:keys.length, perKm: km>0 ? net/km : null, keys};
 }
+function computeMonthBySource(mk){
+  const map = new Map();
+  monthDays(mk).forEach(k=>{
+    db.days[k].rides.forEach(r=>{
+      const name = rideSrcName(r);
+      if(!map.has(name)) map.set(name, {name, count:0, brut:0, net:0});
+      const s = map.get(name);
+      s.count++; s.brut += r.amt; s.net += rideNet(r);
+    });
+  });
+  return Array.from(map.values()).sort((a,b)=>b.brut-a.brut);
+}
 function monthName(mk){
   const d = new Date(mk+'-15T12:00:00');
   const s = d.toLocaleDateString('fr-BE',{month:'long',year:'numeric'});
@@ -666,6 +681,16 @@ function renderHistory(){
     g += '<div class="stat wide"><div class="k">Net − charges</div><div class="v acc">'+fmtEur(m.net-m.charges)+'</div></div>';
   }
   $('monthGrid').innerHTML = g;
+
+  /* totaux par type de course */
+  const bySrc = computeMonthBySource(mk);
+  $('monthBySrc').innerHTML = !bySrc.length ? '' :
+    '<div class="bysrc-title">Par type de course</div><div class="bysrc-list">'+
+    bySrc.map(s=>
+      '<div class="item"><div class="who"><div class="l1">'+esc(s.name)+'</div>'+
+      '<div class="l2">'+s.count+' course'+(s.count>1?'s':'')+' · brut '+fmtEur(s.brut)+'</div></div>'+
+      '<div class="amt"><div class="net">'+fmtEur(s.net)+'</div><div class="brut">net</div></div></div>'
+    ).join('')+'</div>';
 
   const keys = m.keys.slice().reverse();
   if(!keys.length){
@@ -1159,6 +1184,28 @@ function makeMonthPdf(mk){
   text(X.n, y, eurPdf(m.net), 10, true);
   text(X.ch, y, m.charges>0 ? eurPdf(m.charges) : '—', 10, true);
   y -= 28;
+
+  /* par type de course */
+  const bySrc = computeMonthBySource(mk);
+  if(bySrc.length){
+    needs(60);
+    section('Par type de course');
+    const XS = {s:M, c:M+190, b:M+290, n:M+405};
+    text(XS.s, y, 'Source', 9.5, true, true);
+    text(XS.c, y, 'Courses', 9.5, true, true);
+    text(XS.b, y, 'Brut', 9.5, true, true);
+    text(XS.n, y, 'Net', 9.5, true, true);
+    y -= 6; hline(y); y -= 13;
+    bySrc.forEach(s=>{
+      if(y < 70) newPage();
+      text(XS.s, y, s.name, 10, false);
+      text(XS.c, y, String(s.count), 10, false);
+      text(XS.b, y, eurPdf(s.brut), 10, false);
+      text(XS.n, y, eurPdf(s.net), 10, true);
+      y -= 16;
+    });
+    y -= 10;
+  }
 
   needs(170);
   section('Résumé du mois');
