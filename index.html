@@ -323,6 +323,16 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   </div>
 
   <div class="card">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a1 1 0 0 1 1 1z"/><path d="M2 9h13"/><path d="M17 9l3 2v6a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-3"/></svg>Carburant</h2>
+    <label class="fld" for="fuelRate">Coût du carburant par kilomètre</label>
+    <div class="amount-row" style="align-items:center">
+      <input type="text" id="fuelRate" inputmode="decimal" placeholder="ex : 0,12" aria-label="Coût du carburant par kilomètre en euros">
+      <span style="font-weight:700;color:var(--text2);white-space:nowrap">€ / km</span>
+    </div>
+    <div class="note">Le carburant est calculé tout seul : kilomètres du jour (ou du mois) × ce montant. Laissez vide (ou 0) pour ne pas l'afficher. Les dépenses ponctuelles (lavage, entretien…) se notent séparément dans « Charges ».</div>
+  </div>
+
+  <div class="card">
     <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Ajouter une source</h2>
     <div class="row2">
       <input type="text" id="newSrcName" placeholder="Nom — ex : Aéroport" aria-label="Nom de la nouvelle source">
@@ -376,7 +386,7 @@ const DEFAULT_SOURCES = [
   {id:'taxivert', name:'Taxis Verts',   rate:0,  builtin:true},
   {id:'prive',    name:'Course privée', rate:0,  builtin:true},
 ];
-function freshDb(){ return {version:2, sources:JSON.parse(JSON.stringify(DEFAULT_SOURCES)), days:{}, activeDay:null}; }
+function freshDb(){ return {version:2, sources:JSON.parse(JSON.stringify(DEFAULT_SOURCES)), days:{}, activeDay:null, fuelPerKm:0}; }
 
 /* Valide et nettoie en profondeur toute donnée venant du stockage ou d'un import */
 function normalizeDb(d){
@@ -420,6 +430,7 @@ function normalizeDb(d){
     }
   }
   if(typeof d.activeDay==='string' && out.days[d.activeDay]) out.activeDay = d.activeDay;
+  out.fuelPerKm = (isFinite(Number(d.fuelPerKm)) && Number(d.fuelPerKm)>=0) ? Number(d.fuelPerKm) : 0;
   return out;
 }
 function loadDb(){
@@ -499,6 +510,7 @@ function rideNet(r){
   return Math.round(r.amt * (1 - rideRate(r)/100) * 100)/100;
 }
 const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi'};
+function fuelRate(){ const v = Number(db.fuelPerKm); return (isFinite(v) && v>0) ? v : 0; }
 function computeDay(d){
   const brut = d.rides.reduce((a,r)=>a+r.amt,0);
   const net  = d.rides.reduce((a,r)=>a+rideNet(r),0);
@@ -507,19 +519,20 @@ function computeDay(d){
   if(d.kmStart!=null && d.kmEnd!=null){
     if(d.kmEnd >= d.kmStart) km = d.kmEnd - d.kmStart; else kmWarn = true;
   }
+  const fuel = (fuelRate()>0 && km>0) ? Math.round(km*fuelRate()*100)/100 : 0;
   const perKm = (km && km>0) ? net/km : null;
-  return {brut, net, charges, km, kmWarn, perKm, count:d.rides.length};
+  return {brut, net, charges, fuel, km, kmWarn, perKm, count:d.rides.length};
 }
 function monthDays(mk){ return Object.keys(db.days).filter(k=>k.startsWith(mk+'-')).sort(); }
 function computeMonth(mk){
   const keys = monthDays(mk);
-  let brut=0, net=0, charges=0, km=0, count=0;
+  let brut=0, net=0, charges=0, fuel=0, km=0, count=0;
   keys.forEach(k=>{
     const c = computeDay(db.days[k]);
-    brut+=c.brut; net+=c.net; charges+=c.charges; count+=c.count;
+    brut+=c.brut; net+=c.net; charges+=c.charges; fuel+=c.fuel; count+=c.count;
     if(c.km) km+=c.km;
   });
-  return {brut, net, charges, km, count, days:keys.length, perKm: km>0 ? net/km : null, keys};
+  return {brut, net, charges, fuel, km, count, days:keys.length, perKm: km>0 ? net/km : null, keys};
 }
 function computeMonthBySource(mk){
   const map = new Map();
@@ -655,10 +668,9 @@ function renderDay(){
   g += '<div class="stat"><div class="k">Total brut</div><div class="v">'+fmtEur(c.brut)+'</div></div>';
   g += '<div class="stat"><div class="k">Total net</div><div class="v acc">'+fmtEur(c.net)+'</div></div>';
   g += '<div class="stat wide"><div class="k">Rendement</div><div class="v">'+(c.perKm!=null?nf.format(Math.round(c.perKm*100)/100)+' €/km':'—')+'</div></div>';
-  if(c.charges>0){
-    g += '<div class="stat wide"><div class="k">Charges</div><div class="v">'+fmtEur(c.charges)+'</div></div>';
-    g += '<div class="stat wide"><div class="k">Net − charges</div><div class="v acc">'+fmtEur(c.net-c.charges)+'</div></div>';
-  }
+  if(c.fuel>0) g += '<div class="stat wide"><div class="k">Carburant (estimé)</div><div class="v">− '+fmtEur(c.fuel)+'</div></div>';
+  if(c.charges>0) g += '<div class="stat wide"><div class="k">Charges</div><div class="v">− '+fmtEur(c.charges)+'</div></div>';
+  if(c.fuel>0 || c.charges>0) g += '<div class="stat wide"><div class="k">Net après frais</div><div class="v acc">'+fmtEur(c.net-c.charges-c.fuel)+'</div></div>';
   $('sumGrid').innerHTML = g;
   renderHead();
 }
@@ -676,10 +688,9 @@ function renderHistory(){
   g += '<div class="stat"><div class="k">Rendement</div><div class="v">'+(m.perKm!=null?nf.format(Math.round(m.perKm*100)/100)+' €/km':'—')+'</div></div>';
   g += '<div class="stat"><div class="k">Total brut</div><div class="v">'+fmtEur(m.brut)+'</div></div>';
   g += '<div class="stat"><div class="k">Total net</div><div class="v acc">'+fmtEur(m.net)+'</div></div>';
-  if(m.charges>0){
-    g += '<div class="stat wide"><div class="k">Charges</div><div class="v">'+fmtEur(m.charges)+'</div></div>';
-    g += '<div class="stat wide"><div class="k">Net − charges</div><div class="v acc">'+fmtEur(m.net-m.charges)+'</div></div>';
-  }
+  if(m.fuel>0) g += '<div class="stat wide"><div class="k">Carburant (estimé)</div><div class="v">− '+fmtEur(m.fuel)+'</div></div>';
+  if(m.charges>0) g += '<div class="stat wide"><div class="k">Charges</div><div class="v">− '+fmtEur(m.charges)+'</div></div>';
+  if(m.fuel>0 || m.charges>0) g += '<div class="stat wide"><div class="k">Net après frais</div><div class="v acc">'+fmtEur(m.net-m.charges-m.fuel)+'</div></div>';
   $('monthGrid').innerHTML = g;
 
   /* totaux par type de course */
@@ -715,6 +726,7 @@ function renderSettings(){
     (s.builtin ? '' : '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>')+
     '</div>'
   ).join('');
+  $('fuelRate').value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
 }
 function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); }
 
@@ -879,6 +891,22 @@ $('srcSettings').addEventListener('change', e=>{
   inp.value = s.rate;
   const ok = saveDb(); renderDay();
   if(ok) toast(s.name+' : retenue '+nf.format(s.rate)+' % (courses futures)');
+});
+$('fuelRate').addEventListener('change', e=>{
+  const raw = String(e.target.value).trim();
+  if(raw===''){ db.fuelPerKm = 0; }
+  else {
+    const v = Number(raw.replace(',','.'));
+    if(!isFinite(v) || v<0){
+      e.target.value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
+      toast('Valeur invalide — coût carburant inchangé');
+      return;
+    }
+    db.fuelPerKm = Math.round(v*1000)/1000;
+  }
+  e.target.value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
+  const ok = saveDb(); renderDay(); renderHistory();
+  if(ok) toast(fuelRate()>0 ? 'Carburant : '+String(db.fuelPerKm).replace('.',',')+' €/km' : 'Carburant désactivé');
 });
 $('srcSettings').addEventListener('click', e=>{
   const b = e.target.closest('[data-del-src]');
@@ -1068,10 +1096,9 @@ function makePdf(dateKey, day){
     ['Total net', eurPdf(c.net), true],
     ['Rendement', c.perKm!=null ? nf.format(Math.round(c.perKm*100)/100)+' €/km' : '—', false],
   ];
-  if(c.charges>0){
-    rows.push(['Charges', eurPdf(c.charges), false]);
-    rows.push(['Net - charges', eurPdf(c.net-c.charges), true]);
-  }
+  if(c.fuel>0) rows.push(['Carburant (estimé)', '- '+eurPdf(c.fuel), false]);
+  if(c.charges>0) rows.push(['Charges', '- '+eurPdf(c.charges), false]);
+  if(c.fuel>0 || c.charges>0) rows.push(['Net après frais', eurPdf(c.net-c.charges-c.fuel), true]);
   rows.forEach(([k,v,strong])=>{
     if(y < 70) newPage();
     text(M, y, k, 11, false, !strong);
@@ -1216,10 +1243,9 @@ function makeMonthPdf(mk){
     ['Total net', eurPdf(m.net), true],
     ['Rendement', m.perKm!=null ? nf.format(Math.round(m.perKm*100)/100)+' €/km' : '—', false],
   ];
-  if(m.charges>0){
-    rows.push(['Charges', eurPdf(m.charges), false]);
-    rows.push(['Net - charges', eurPdf(m.net-m.charges), true]);
-  }
+  if(m.fuel>0) rows.push(['Carburant (estimé)', '- '+eurPdf(m.fuel), false]);
+  if(m.charges>0) rows.push(['Charges', '- '+eurPdf(m.charges), false]);
+  if(m.fuel>0 || m.charges>0) rows.push(['Net après frais', eurPdf(m.net-m.charges-m.fuel), true]);
   rows.forEach(([k,v,strong])=>{
     if(y < 70) newPage();
     text(M, y, k, 11, false, !strong);
