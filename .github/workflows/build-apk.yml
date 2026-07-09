@@ -1,0 +1,58 @@
+name: Construire l'APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Composants SDK
+        run: |
+          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" >/dev/null 2>&1 || true
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Construire l'APK (debug)
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Préparer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk taxi-copilote.apk
+
+      - name: Artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxi-copilote-apk
+          path: taxi-copilote.apk
+
+      - name: Publier la release (téléchargeable sur le téléphone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Taxi Copilote — dernier APK
+          body: "APK de test, reconstruit automatiquement à chaque mise à jour. À installer sur le Xiaomi (autoriser les sources inconnues)."
+          files: taxi-copilote.apk

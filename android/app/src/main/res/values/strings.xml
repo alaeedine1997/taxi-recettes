@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Taxi Recettes</string>
+    <string name="copilote_title">Copilote</string>
+    <string name="log_title">Journal (mouchard)</string>
+    <string name="accessibility_label">Copilote Taxi — lecture des courses</string>
+    <string name="accessibility_desc">Lit (sans jamais agir) les écrans Uber, Bolt et Taxis Verts pour enregistrer automatiquement vos courses dans votre carnet. Ne touche à rien, n\'accepte aucune course.</string>
+    <string name="notif_label">Copilote Taxi — notifications</string>
+    <string name="open_copilote">Copilote</string>
+</resources>
