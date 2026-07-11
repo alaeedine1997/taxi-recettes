@@ -11,16 +11,27 @@ android {
         applicationId = "be.taxirecettes.copilote"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
+    }
+
+    signingConfigs {
+        create("stable") {
+            storeFile = file("signing/taxi.keystore")
+            storePassword = "taxicopilote"
+            keyAlias = "taxi"
+            keyPassword = "taxicopilote"
+        }
     }
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
         }
         getByName("debug") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
         }
     }
 

@@ -23,6 +23,10 @@ class CopiloteAccessibilityService : AccessibilityService() {
     private var lastLoggedHash = 0
     private var lastLoggedAt = 0L
 
+    // Détection (v1.0-alpha) : dernière offre reconnue + anti-répétition
+    private var lastOffer: DetectedRide? = null
+    private var lastOfferKey = ""
+
     // Mots-repères d'un écran de course (offre ou fin), toutes plateformes confondues.
     private val strongAnchors = listOf(
         "net, ttc", "hors frais", "je suis intéress", "nouvelle demande de course",
@@ -46,9 +50,17 @@ class CopiloteAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 val t = event.text?.joinToString(" ")?.trim() ?: ""
                 val l = t.lowercase()
-                if (t.isNotBlank() && (l.contains("accepter") || l.contains("refuser") ||
-                        l.contains("répondre") || l.contains("intéress"))) {
+                val accept = l.contains("accepter") || l.contains("répondre") || l.contains("je suis intéress")
+                val refuse = l.contains("refuser")
+                if (t.isNotBlank() && (accept || refuse)) {
                     LogStore.append(this, "${LogStore.ts()} [CLIC] $pkg : $t")
+                    val r = lastOffer ?: if (accept) RideDetector.parse(t) else null
+                    if (accept && r != null) {
+                        LogStore.append(this, "${LogStore.ts()} [DÉTECTÉ-ACCEPTÉE] ${r.pretty()}")
+                    } else if (refuse) {
+                        LogStore.append(this, "${LogStore.ts()} [DÉTECTÉ-REFUSÉE] ${r?.pretty() ?: "?"}")
+                        lastOffer = null
+                    }
                 }
             }
         }
@@ -72,6 +84,16 @@ class CopiloteAccessibilityService : AccessibilityService() {
             lastLoggedHash = h
             lastLoggedAt = now
             LogStore.append(this, "${LogStore.ts()} [COURSE] $pkg\n$kept")
+
+            // Détection (v1.0-alpha) : on identifie et on journalise, sans agir
+            val ride = RideDetector.parse(kept)
+            if (ride != null) {
+                lastOffer = ride
+                if (ride.key() != lastOfferKey) {
+                    lastOfferKey = ride.key()
+                    LogStore.append(this, "${LogStore.ts()} [DÉTECTÉ-OFFRE] ${ride.pretty()}")
+                }
+            }
         } catch (_: Exception) {
         }
     }
