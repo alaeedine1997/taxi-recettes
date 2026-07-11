@@ -5,14 +5,16 @@ package be.taxirecettes.copilote
  * la plateforme, le montant et le mode de paiement, d'après les vraies structures observées :
  *
  *  Uber        : "UberX  9,22 €  ...  Hors frais de service  ...  Je suis intéressé(e)"
- *  Bolt        : "Bolt  Espèces  15,16 € (net, TTC)  ...  Refuser / Répondre"
- *  Taxis Verts : "Nouvelle course ... You get €16.81 ... Payer par: Facture / Paiement à bord ... ACCEPTER"
+ *  Bolt        : "Bolt  Espèces|Carte  12,42 € (net, TTC)  ...  Refuser / Répondre"
+ *  Taxis Verts : "Nouvelle course ... You get €16.81 ... Payer par: Facture | Paiement à bord ... ACCEPTER"
  *
+ * IMPORTANT : les montants utilisent un ESPACE INSÉCABLE (U+00A0) avant le € — les regex
+ * n'utilisent donc pas \s (qui ne le reconnaît pas) mais des classes tolérantes.
  * Pour l'instant on ne fait qu'IDENTIFIER et journaliser (aucun popup, aucune action).
  */
 data class DetectedRide(
     val platform: String,   // Uber | Bolt | Taxis Verts | Privé
-    val amount: String,     // normalisé "15,16" (vide si non trouvé)
+    val amount: String,     // normalisé "12,42" (vide si non trouvé)
     val payment: String     // cash | app | ?
 ) {
     fun key() = "$platform|$amount|$payment"
@@ -21,8 +23,10 @@ data class DetectedRide(
 
 object RideDetector {
 
-    private val reFr = Regex("(\\d{1,4},\\d{2})")            // 15,16
-    private val reEn = Regex("(\\d{1,4}\\.\\d{2})")          // 16.81
+    private val anyFr = Regex("(\\d{1,4},\\d{2})")             // 12,42
+    private val anyEn = Regex("(\\d{1,4}\\.\\d{2})")           // 16.81
+    private val boltNet = Regex("(\\d{1,4},\\d{2})[^\\d(]{0,8}\\(net")   // 12,42 <nbsp>€ (net
+    private val tvYouGet = Regex("you get[^\\d]{0,60}(\\d{1,4}[.,]\\d{2})", RegexOption.IGNORE_CASE)
 
     fun parse(text: String): DetectedRide? {
         val l = text.lowercase()
@@ -39,30 +43,20 @@ object RideDetector {
         }
 
         val amount = when (platform) {
-            "Bolt" -> {
-                // montant "net, TTC" en priorité
-                val m = Regex("(\\d{1,4},\\d{2})\\s*€\\s*\\(net").find(text)
-                    ?: reFr.find(text)?.let { Regex("(\\d{1,4},\\d{2})\\s*€").find(text) }
-                (m?.groupValues?.get(1)) ?: (reFr.find(text)?.value ?: "")
-            }
-            "Uber" -> {
-                // premier montant en euros de l'offre
-                Regex("(\\d{1,4},\\d{2})\\s*€").find(text)?.groupValues?.get(1)
-                    ?: (reFr.find(text)?.value ?: "")
-            }
+            "Bolt" -> boltNet.find(text)?.groupValues?.get(1)
+                ?: anyFr.find(text)?.groupValues?.get(1) ?: ""
+            "Uber" -> anyFr.find(text)?.groupValues?.get(1) ?: ""
             "Taxis Verts" -> {
-                // "You get €16.81" (format point) ; on renormalise en virgule
-                val en = Regex("you get[^\\d]{0,20}€?\\s*(\\d{1,4}[.,]\\d{2})", RegexOption.IGNORE_CASE).find(text)
-                    ?.groupValues?.get(1)
-                    ?: Regex("€\\s*(\\d{1,4}[.,]\\d{2})").find(text)?.groupValues?.get(1)
-                    ?: (reEn.find(text)?.value ?: reFr.find(text)?.value ?: "")
-                en.replace('.', ',')
+                val a = tvYouGet.find(text)?.groupValues?.get(1)
+                    ?: anyEn.find(text)?.groupValues?.get(1)
+                    ?: anyFr.find(text)?.groupValues?.get(1) ?: ""
+                a.replace('.', ',')
             }
             else -> ""
         }
 
         val payment = when (platform) {
-            "Bolt" -> if (l.contains("espèces")) "cash" else "app"
+            "Bolt" -> if (l.contains("espèces")) "cash" else "app"   // Carte = payé dans l'app = net
             "Taxis Verts" -> when {
                 l.contains("paiement à bord") || l.contains("à bord") -> "cash"
                 l.contains("facture") -> "app"
