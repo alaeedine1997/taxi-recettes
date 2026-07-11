@@ -13,7 +13,7 @@ import java.util.Locale
  */
 object LogStore {
     private const val FILE = "mouchard.log"
-    private const val MAX_BYTES = 3_000_000L // ~3 Mo
+    private const val MAX_BYTES = 12_000_000L // ~12 Mo (large : le bruit est filtré, une journée entière tient)
     private val lock = Any()
     private val fmt = SimpleDateFormat("dd/MM HH:mm:ss", Locale.FRANCE)
 

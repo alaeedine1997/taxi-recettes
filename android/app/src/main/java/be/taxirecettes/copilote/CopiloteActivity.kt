@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -176,16 +175,13 @@ class CopiloteActivity : AppCompatActivity() {
     }
 
     private fun isAccessibilityOn(): Boolean {
-        val expected = ComponentName(this, CopiloteAccessibilityService::class.java).flattenToString()
+        // Robuste : le système stocke tantôt la forme longue, tantôt la forme courte
+        // du composant. On repère simplement notre service par son nom de classe.
         val enabled = Settings.Secure.getString(
             contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(enabled)
-        while (splitter.hasNext()) {
-            if (splitter.next().equals(expected, ignoreCase = true)) return true
-        }
-        return false
+        )?.lowercase() ?: return false
+        return enabled.contains(packageName.lowercase()) &&
+            enabled.contains("copiloteaccessibilityservice")
     }
 
     private fun isNotifOn(): Boolean =
