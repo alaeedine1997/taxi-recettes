@@ -304,6 +304,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       </button>
     </div>
     <div class="sumgrid" id="monthGrid" style="margin-top:12px"></div>
+    <div id="monthByPay"></div>
     <div id="monthBySrc"></div>
     <button type="button" class="btn btn-primary btn-full" id="monthPdfBtn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
@@ -546,6 +547,16 @@ function computeMonthBySource(mk){
   });
   return Array.from(map.values()).sort((a,b)=>b.brut-a.brut);
 }
+function computeMonthByPayment(mk){
+  const acc = {cash:0, sumup:0, cheque:0, app:0};
+  monthDays(mk).forEach(k=>{
+    db.days[k].rides.forEach(r=>{
+      const p = (r.pay in acc) ? r.pay : 'app';
+      acc[p] += rideNet(r);
+    });
+  });
+  return acc;
+}
 function monthName(mk){
   const d = new Date(mk+'-15T12:00:00');
   const s = d.toLocaleDateString('fr-BE',{month:'long',year:'numeric'});
@@ -692,6 +703,17 @@ function renderHistory(){
   if(m.charges>0) g += '<div class="stat wide"><div class="k">Charges</div><div class="v">− '+fmtEur(m.charges)+'</div></div>';
   if(m.fuel>0 || m.charges>0) g += '<div class="stat wide"><div class="k">Net après frais</div><div class="v acc">'+fmtEur(m.net-m.charges-m.fuel)+'</div></div>';
   $('monthGrid').innerHTML = g;
+
+  /* totaux par mode de paiement (cash / facturé) — priorité fin de mois */
+  const byPay = computeMonthByPayment(mk);
+  const payLabel = {cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi', app:'Facturé / App'};
+  const payRows = ['cash','sumup','cheque','app'].filter(p=>byPay[p]>0.0001);
+  $('monthByPay').innerHTML = !payRows.length ? '' :
+    '<div class="bysrc-title">Par mode de paiement (net)</div><div class="bysrc-list">'+
+    payRows.map(p=>
+      '<div class="item"><div class="who"><div class="l1">'+payLabel[p]+'</div></div>'+
+      '<div class="amt"><div class="net">'+fmtEur(byPay[p])+'</div></div></div>'
+    ).join('')+'</div>';
 
   /* totaux par type de course */
   const bySrc = computeMonthBySource(mk);
@@ -1232,6 +1254,22 @@ function makeMonthPdf(mk){
       y -= 16;
     });
     y -= 10;
+  }
+
+  /* par mode de paiement (cash / facturé) */
+  const byPay = computeMonthByPayment(mk);
+  const payRowsPdf = [['cash','Cash'],['sumup','SumUp'],['cheque','Chèque taxi'],['app','Facturé / App']]
+    .filter(x=>byPay[x[0]]>0.0001);
+  if(payRowsPdf.length){
+    needs(40 + payRowsPdf.length*16);
+    section('Par mode de paiement (net)');
+    payRowsPdf.forEach(([p,lab])=>{
+      if(y < 70) newPage();
+      text(M, y, lab, 11, false);
+      text(M+375, y, eurPdf(byPay[p]), 11, true);
+      y -= 17;
+    });
+    y -= 8;
   }
 
   needs(170);
