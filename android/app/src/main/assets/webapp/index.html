@@ -148,6 +148,12 @@ input:disabled{opacity:.55}
 .monthnav .monthlabel{flex:1;text-align:center;font-weight:800;font-size:17px;text-transform:capitalize}
 .bysrc-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
 .bysrc-list{display:flex;flex-direction:column;gap:8px}
+.quicklink{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:transparent;border:1.5px dashed var(--border);color:var(--text2);font-size:14px;font-weight:600;padding:10px;border-radius:12px;cursor:pointer;min-height:44px;margin-top:12px}
+.quicklink:active{background:var(--chip-bg)}
+.quick-grid{display:grid;grid-template-columns:minmax(0,88px) 1fr minmax(0,104px);gap:8px;align-items:center;margin-top:8px}
+.quick-grid .qname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-grid input{min-height:46px}
+.quick-grid select{min-height:46px;font-size:15px;padding:8px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);appearance:none;-webkit-appearance:none}
 /* settings */
 .src-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .src-row:last-child{border-bottom:none}
@@ -261,6 +267,19 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
         </button>
       </div>
     </div>
+
+    <div id="quickWrap">
+      <button type="button" class="quicklink" id="quickToggle" aria-expanded="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Saisie rapide — totaux du jour
+      </button>
+      <div id="quickForm" class="hidden">
+        <div class="note">Pas envie de faire course par course ? Entre directement le total par application. Chaque montant rempli devient une ligne dans ta journée.</div>
+        <div id="quickRows"></div>
+        <button type="button" class="btn btn-accent btn-full" id="quickAdd" style="margin-top:12px">Ajouter ces totaux</button>
+      </div>
+    </div>
+
     <div class="list" id="rideList"></div>
   </div>
 
@@ -749,7 +768,20 @@ function renderSettings(){
   ).join('');
   $('fuelRate').value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
 }
-function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); }
+function renderQuickRows(){
+  const el = $('quickRows');
+  if(!el) return;
+  el.innerHTML = db.sources.map(s=>
+    '<div class="quick-grid">'+
+    '<div class="qname">'+esc(s.name)+'</div>'+
+    '<input type="text" inputmode="decimal" data-qamt="'+esc(s.id)+'" placeholder="Total €" aria-label="Total '+esc(s.name)+'">'+
+    '<select data-qpay="'+esc(s.id)+'" aria-label="Paiement '+esc(s.name)+'">'+
+      '<option value="app">Facturé</option><option value="cash">Cash</option><option value="sumup">SumUp</option><option value="cheque">Chèque</option>'+
+    '</select>'+
+    '</div>'
+  ).join('');
+}
+function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); renderQuickRows(); }
 
 /* ============================== ÉVÉNEMENTS ============================== */
 document.querySelectorAll('nav.tabs button').forEach(b=>{
@@ -846,6 +878,38 @@ $('addRide').addEventListener('click', ()=>{
   if(ok) toast('Course '+sourceName(state.src)+' ajoutée — '+fmtEur(amt));
 });
 $('amount').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRide').click(); } });
+
+$('quickToggle').addEventListener('click', ()=>{
+  const f = $('quickForm');
+  const open = f.classList.toggle('hidden');
+  $('quickToggle').setAttribute('aria-expanded', String(!open));
+});
+$('quickAdd').addEventListener('click', ()=>{
+  const d = getDay(state.date);
+  let added=0, net=0;
+  db.sources.forEach(s=>{
+    const inp = document.querySelector('[data-qamt="'+CSS.escape(s.id)+'"]');
+    const sel = document.querySelector('[data-qpay="'+CSS.escape(s.id)+'"]');
+    if(!inp) return;
+    const amt = parseAmount(inp.value);
+    if(isNaN(amt)) return;
+    const pay = (sel && ['app','cash','sumup','cheque'].includes(sel.value)) ? sel.value : 'app';
+    d.rides.push({
+      id:'r'+Date.now()+Math.floor(Math.random()*1000)+added,
+      t:'', src:s.id, srcName:s.name, pay, amt,
+      rate: pay==='app' ? 0 : rateOf(s.id)
+    });
+    net += rideNet(d.rides[d.rides.length-1]);
+    inp.value='';
+    added++;
+  });
+  if(!added){ toast('Entre au moins un montant'); return; }
+  const ok = saveDb();
+  $('quickForm').classList.add('hidden');
+  $('quickToggle').setAttribute('aria-expanded','false');
+  renderDay();
+  if(ok) toast(added+' total'+(added>1?'aux':'')+' ajouté'+(added>1?'s':'')+' — net '+fmtEur(net));
+});
 
 $('rideList').addEventListener('click', e=>{
   const b = e.target.closest('[data-del-ride]');
