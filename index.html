@@ -156,11 +156,12 @@ input:disabled{opacity:.55}
 .quick-grid input{min-height:46px}
 .quick-grid select{min-height:46px;font-size:15px;padding:8px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);appearance:none;-webkit-appearance:none}
 /* settings */
-.src-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.src-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}
 .src-row:last-child{border-bottom:none}
-.src-row .nm{flex:1;font-weight:600;font-size:15px}
-.src-row input{width:86px;text-align:right;min-height:44px;padding:8px 10px}
-.src-row .pct{color:var(--text2);font-size:14px}
+.src-row input{min-height:44px;padding:8px 10px;font-size:15px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);border-radius:12px}
+.src-row .srcname{flex:1;min-width:0;text-align:left;font-weight:600}
+.src-row .srate{width:60px;text-align:right;flex:none}
+.src-row .pct{color:var(--text2);font-size:14px;flex:none}
 .note{font-size:13px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px}
 .banner{
   width:100%;display:flex;align-items:center;gap:10px;margin-top:10px;
@@ -761,10 +762,11 @@ function renderHistory(){
 }
 function renderSettings(){
   $('srcSettings').innerHTML = db.sources.map(s=>
-    '<div class="src-row"><div class="nm">'+esc(s.name)+'</div>'+
-    '<input type="text" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
+    '<div class="src-row">'+
+    '<input type="text" class="srcname" value="'+esc(s.name)+'" data-name="'+esc(s.id)+'" aria-label="Nom de la source">'+
+    '<input type="text" class="srate" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
     '<span class="pct">%</span>'+
-    (s.builtin ? '' : '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>')+
+    '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>'+
     '</div>'
   ).join('');
   $('fuelRate').value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
@@ -962,6 +964,18 @@ $('monthPdfBtn').addEventListener('click', ()=>{
     .then(ok=>{ if(ok) toast('PDF du mois prêt'); });
 });
 $('srcSettings').addEventListener('change', e=>{
+  const nameInp = e.target.closest('[data-name]');
+  if(nameInp){
+    const s = sourceOf(nameInp.dataset.name);
+    if(!s) return;
+    const nm = String(nameInp.value).trim();
+    if(nm===''){ nameInp.value = s.name; toast('Le nom ne peut pas être vide'); return; }
+    s.name = nm;
+    nameInp.value = nm;
+    const ok = saveDb(); renderDay(); renderQuickRows(); renderHistory();
+    if(ok) toast('Renommé : '+nm+' (les anciennes courses gardent leur nom)');
+    return;
+  }
   const inp = e.target.closest('[data-rate]');
   if(!inp) return;
   const s = sourceOf(inp.dataset.rate);
