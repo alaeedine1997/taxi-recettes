@@ -45,7 +45,8 @@ object RideDetector {
         val amount = when (platform) {
             "Bolt" -> boltNet.find(text)?.groupValues?.get(1)
                 ?: anyFr.find(text)?.groupValues?.get(1) ?: ""
-            "Uber" -> anyFr.find(text)?.groupValues?.get(1) ?: ""
+            "Uber" -> Regex("(\\d{1,4},\\d{2})[^\\d]{0,3}€").find(text)?.groupValues?.get(1)
+                ?: anyFr.find(text)?.groupValues?.get(1) ?: ""
             "Taxis Verts" -> {
                 val a = tvYouGet.find(text)?.groupValues?.get(1)
                     ?: anyEn.find(text)?.groupValues?.get(1)
