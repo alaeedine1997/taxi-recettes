@@ -88,6 +88,7 @@ input:disabled{opacity:.55}
 }
 .seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.15)}
 .amount-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px}
+.amount-row.ac2{grid-template-columns:1fr 1fr auto}
 .btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
   border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;
@@ -152,6 +153,9 @@ input:disabled{opacity:.55}
 .quicklink{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:transparent;border:1.5px dashed var(--border);color:var(--text2);font-size:14px;font-weight:600;padding:10px;border-radius:12px;cursor:pointer;min-height:44px;margin-top:12px}
 .quicklink:active{background:var(--chip-bg)}
 .quick-grid{display:grid;grid-template-columns:minmax(0,88px) 1fr minmax(0,104px);gap:8px;align-items:center;margin-top:8px}
+.quick-grid.appcash{grid-template-columns:minmax(0,72px) 1fr 1fr}
+.appcash-opt{display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:13.5px;color:var(--text2);cursor:pointer;line-height:1.35}
+.appcash-opt input{width:18px;height:18px;min-height:0;flex:0 0 auto;margin-top:1px}
 .quick-grid .qname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .quick-grid input{min-height:46px}
 .quick-grid select{min-height:46px;font-size:15px;padding:8px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);appearance:none;-webkit-appearance:none}
@@ -266,16 +270,26 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     <div id="addRideForm">
       <label class="fld">Source</label>
       <div class="chips" id="srcChips" role="radiogroup" aria-label="Source de la course"></div>
-      <label class="fld">Paiement</label>
-      <div class="seg" id="paySeg" role="radiogroup" aria-label="Mode de paiement">
-        <button type="button" data-pay="app">App / Facturé</button>
-        <button type="button" data-pay="cash">Cash</button>
-        <button type="button" data-pay="sumup">SumUp</button>
-        <button type="button" data-pay="cheque">Chèque taxi</button>
+      <div id="payWrap">
+        <label class="fld">Paiement</label>
+        <div class="seg" id="paySeg" role="radiogroup" aria-label="Mode de paiement">
+          <button type="button" data-pay="app">App / Facturé</button>
+          <button type="button" data-pay="cash">Cash</button>
+          <button type="button" data-pay="sumup">SumUp</button>
+          <button type="button" data-pay="cheque">Chèque taxi</button>
+        </div>
       </div>
-      <div class="amount-row">
+      <div class="amount-row" id="amountRow">
         <input type="text" id="amount" inputmode="decimal" placeholder="Montant € — ex : 42,96" aria-label="Montant de la course en euros">
         <button type="button" class="btn btn-accent" id="addRide">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Ajouter
+        </button>
+      </div>
+      <div class="amount-row ac2 hidden" id="appcashRow">
+        <input type="text" id="amountApp" inputmode="decimal" placeholder="Sur l'app €" aria-label="Total sur l'app">
+        <input type="text" id="amountCash" inputmode="decimal" placeholder="Cash €" aria-label="Cash encaissé">
+        <button type="button" class="btn btn-accent" id="addRideAC">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
           Ajouter
         </button>
@@ -424,6 +438,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <input type="text" id="newSrcName" placeholder="Nom — ex : Aéroport" aria-label="Nom de la nouvelle source">
       <input type="text" id="newSrcRate" inputmode="decimal" placeholder="Retenue %" aria-label="Pourcentage de retenue">
     </div>
+    <label class="appcash-opt"><input type="checkbox" id="newSrcAppCash">Style Uber / Bolt — saisie « Sur l'app + Cash », sans commission</label>
     <button type="button" class="btn btn-accent btn-full" id="addSrcBtn">Ajouter la source</button>
   </div>
 
@@ -470,8 +485,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 /* ============================== DONNÉES ============================== */
 const STORE_KEY = 'taxiRecettesV1';
 const DEFAULT_SOURCES = [
-  {id:'uber',     name:'Uber',          rate:33, builtin:true},
-  {id:'bolt',     name:'Bolt',          rate:30, builtin:true},
+  {id:'uber',     name:'Uber',          rate:0,  builtin:true, appCash:true},
+  {id:'bolt',     name:'Bolt',          rate:0,  builtin:true, appCash:true},
   {id:'heetch',   name:'Heetch',        rate:18, builtin:true},
   {id:'taxivert', name:'Taxis Verts',   rate:0,  builtin:true},
   {id:'prive',    name:'Course privée', rate:0,  builtin:true},
@@ -498,7 +513,16 @@ function normalizeDb(d){
   if(Array.isArray(d.sources)){
     const srcs = d.sources
       .filter(s=>s && typeof s==='object' && typeof s.id==='string' && typeof s.name==='string')
-      .map(s=>({id:s.id, name:s.name, rate:Math.min(100,Math.max(0,Number(s.rate)||0)), builtin:!!s.builtin}));
+      .map(s=>{
+        const def = DEFAULT_SOURCES.find(x=>x.id===s.id);
+        const appCash = (typeof s.appCash==='boolean') ? s.appCash : (def ? !!def.appCash : false);
+        return {
+          id:s.id, name:s.name,
+          rate: appCash ? 0 : Math.min(100,Math.max(0,Number(s.rate)||0)),
+          builtin:!!s.builtin,
+          appCash
+        };
+      });
     if(srcs.length) out.sources = srcs;
   }
   if(d.days && typeof d.days==='object' && !Array.isArray(d.days)){
@@ -513,15 +537,25 @@ function normalizeDb(d){
         closedAt: (typeof v.closedAt==='string' && /^\d{2}:\d{2}$/.test(v.closedAt)) ? v.closedAt : null,
         rides: Array.isArray(v.rides) ? v.rides
           .filter(r=>r && typeof r==='object' && isFinite(Number(r.amt)) && Number(r.amt)>0)
-          .map(r=>({
-            id: String(r.id || ('r'+Date.now()+Math.floor(Math.random()*1e6))),
-            t: String(r.t||''),
-            src: String(r.src||''),
-            srcName: String(r.srcName||''),
-            pay: (r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque') ? r.pay : 'app',
-            amt: Math.round(Number(r.amt)*100)/100,
-            rate: isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate))) : undefined
-          })) : [],
+          .map(r=>{
+            const pay = (r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque'||r.pay==='appcash') ? r.pay : 'app';
+            const src = String(r.src||'');
+            /* Course Uber/Bolt (sans commission) : on fige le taux à 0 de façon PERMANENTE,
+               ainsi le net reste = montant même si la source est renommée ou supprimée plus tard. */
+            const srcAppCash = out.sources.some(x=>x.id===src && x.appCash);
+            const o = {
+              id: String(r.id || ('r'+Date.now()+Math.floor(Math.random()*1e6))),
+              t: String(r.t||''),
+              src,
+              srcName: String(r.srcName||''),
+              pay,
+              amt: Math.round(Number(r.amt)*100)/100,
+              rate: (pay==='appcash' || srcAppCash) ? 0
+                    : (isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate))) : undefined)
+            };
+            if(pay==='appcash'){ const c=Number(r.cash); o.cash = (isFinite(c)&&c>=0) ? Math.round(c*100)/100 : 0; }
+            return o;
+          }) : [],
         charges: Array.isArray(v.charges) ? v.charges
           .filter(c=>c && typeof c==='object' && isFinite(Number(c.amt)) && Number(c.amt)>0)
           .map(c=>({
@@ -615,11 +649,30 @@ function rateOf(id){ const s=sourceOf(id); return s ? (Number(s.rate)||0) : 0; }
 /* Le taux est figé sur la course au moment de l'ajout ; repli sur le taux actuel pour les anciennes données */
 function rideRate(r){ return (typeof r.rate==='number' && isFinite(r.rate)) ? r.rate : rateOf(r.src); }
 function rideSrcName(r){ return r.srcName || sourceName(r.src); }
+function sourceIsAppCash(id){ const s=sourceOf(id); return !!(s && s.appCash); }
+/* Net d'une course. Uber/Bolt (app+cash) : plus de commission, le net = le montant.
+   appcash = une saisie « Sur l'app + Cash » : le net (revenu) = le total sur l'app. */
 function rideNet(r){
+  if(r.pay==='appcash') return r.amt;
+  if(sourceIsAppCash(r.src)) return r.amt;
   if(r.pay==='app') return r.amt;
   return Math.round(r.amt * (1 - rideRate(r)/100) * 100)/100;
 }
-const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi'};
+/* Répartit le net d'une course entre les 4 seaux d'encaissement.
+   Une saisie appcash donne : cash = ce qui est pris en liquide, app = virement (total − cash, peut être négatif). */
+function ridePayParts(r){
+  const out = {cash:0, app:0, sumup:0, cheque:0};
+  if(r.pay==='appcash'){
+    const C = Math.round((Number(r.cash)||0)*100)/100;
+    out.cash = C;
+    out.app  = Math.round((r.amt - C)*100)/100;
+    return out;
+  }
+  const p = (r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque') ? r.pay : 'app';
+  out[p] = rideNet(r);
+  return out;
+}
+const PAY_LABEL = {app:'App / Facturé', cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi', appcash:'Sur l\'app'};
 function fuelRate(){ const v = Number(db.fuelPerKm); return (isFinite(v) && v>0) ? v : 0; }
 function computeDay(d){
   const brut = d.rides.reduce((a,r)=>a+r.amt,0);
@@ -649,21 +702,29 @@ function computeMonthBySource(mk){
   monthDays(mk).forEach(k=>{
     db.days[k].rides.forEach(r=>{
       const name = rideSrcName(r);
-      if(!map.has(name)) map.set(name, {name, count:0, brut:0, net:0});
+      if(!map.has(name)) map.set(name, {name, count:0, brut:0, net:0, appCash:false, parts:{cash:0,app:0,sumup:0,cheque:0}});
       const s = map.get(name);
       s.count++; s.brut += r.amt; s.net += rideNet(r);
+      const pp = ridePayParts(r);
+      s.parts.cash+=pp.cash; s.parts.app+=pp.app; s.parts.sumup+=pp.sumup; s.parts.cheque+=pp.cheque;
+      if(r.pay==='appcash' || sourceIsAppCash(r.src)) s.appCash=true;
     });
   });
-  return Array.from(map.values()).sort((a,b)=>b.brut-a.brut);
+  return Array.from(map.values()).map(s=>{
+    s.brut=Math.round(s.brut*100)/100; s.net=Math.round(s.net*100)/100;
+    for(const kk in s.parts) s.parts[kk]=Math.round(s.parts[kk]*100)/100;
+    return s;
+  }).sort((a,b)=>b.net-a.net);
 }
 function computeMonthByPayment(mk){
   const acc = {cash:0, sumup:0, cheque:0, app:0};
   monthDays(mk).forEach(k=>{
     db.days[k].rides.forEach(r=>{
-      const p = (r.pay in acc) ? r.pay : 'app';
-      acc[p] += rideNet(r);
+      const pp = ridePayParts(r);
+      acc.cash+=pp.cash; acc.app+=pp.app; acc.sumup+=pp.sumup; acc.cheque+=pp.cheque;
     });
   });
+  for(const k in acc) acc[k]=Math.round(acc[k]*100)/100;
   return acc;
 }
 function monthName(mk){
@@ -744,6 +805,12 @@ function renderDay(){
     '<button type="button" role="radio" aria-checked="'+(s.id===state.src)+'" class="chip'+(s.id===state.src?' on':'')+'" data-src="'+esc(s.id)+'">'+esc(s.name)+'</button>'
   ).join('');
 
+  /* formulaire adapté : Uber/Bolt (app+cash) → 2 champs ; autres → paiement + montant */
+  const isAC = sourceIsAppCash(state.src);
+  show('payWrap', !isAC);
+  show('amountRow', !isAC);
+  show('appcashRow', isAC);
+
   /* segmented paiement */
   document.querySelectorAll('#paySeg button').forEach(b=>{
     const on = b.dataset.pay===state.pay;
@@ -759,8 +826,18 @@ function renderDay(){
       : '<div class="empty">Aucune course.</div>';
   }else{
     $('rideList').innerHTML = d.rides.map(r=>{
+      if(r.pay==='appcash'){
+        const C = Math.round((Number(r.cash)||0)*100)/100;
+        const vir = Math.round((r.amt - C)*100)/100;
+        return '<div class="item">'+
+          '<div class="who"><div class="l1">'+esc(rideSrcName(r))+' <span class="badge app">Sur l\'app</span></div>'+
+          '<div class="l2">cash '+fmtEur(C)+' · virement '+fmtEur(vir)+'</div></div>'+
+          '<div class="amt"><div class="net">'+fmtEur(r.amt)+'</div><div class="brut">sur l\'app</div></div>'+
+          '<button type="button" class="icon-btn danger" data-del-ride="'+esc(r.id)+'" aria-label="Supprimer cette entrée">'+TRASH+'</button>'+
+        '</div>';
+      }
       const net = rideNet(r);
-      const diff = r.pay!=='app' && rideRate(r)>0;
+      const diff = r.pay!=='app' && !sourceIsAppCash(r.src) && rideRate(r)>0;
       return '<div class="item">'+
         '<div class="who"><div class="l1">'+esc(rideSrcName(r))+' <span class="badge '+esc(r.pay)+'">'+PAY_LABEL[r.pay]+'</span></div>'+
         '<div class="l2">'+(r.t?esc(r.t):'—')+(diff?' · retenue '+nf.format(rideRate(r))+' %':'')+'</div></div>'+
@@ -813,26 +890,40 @@ function renderHistory(){
   if(m.fuel>0 || m.charges>0) g += '<div class="stat wide"><div class="k">Net après frais</div><div class="v acc">'+fmtEur(m.net-m.charges-m.fuel)+'</div></div>';
   $('monthGrid').innerHTML = g;
 
-  /* totaux par mode de paiement (cash / facturé) — priorité fin de mois */
+  /* grands totaux d'encaissement (cash / facturé) — LA priorité de fin de mois */
   const byPay = computeMonthByPayment(mk);
-  const payLabel = {cash:'Cash', sumup:'SumUp', cheque:'Chèque taxi', app:'Facturé / App'};
-  const payRows = ['cash','sumup','cheque','app'].filter(p=>byPay[p]>0.0001);
+  const payLabel = {cash:'Cash (en poche)', app:'Facturé / virement', cheque:'Chèque taxi', sumup:'SumUp'};
+  const payRows = ['cash','app','cheque','sumup'].filter(p=>Math.abs(byPay[p])>0.0001);
   $('monthByPay').innerHTML = !payRows.length ? '' :
-    '<div class="bysrc-title">Par mode de paiement (net)</div><div class="bysrc-list">'+
+    '<div class="bysrc-title">Encaissements du mois (net)</div><div class="bysrc-list">'+
     payRows.map(p=>
       '<div class="item"><div class="who"><div class="l1">'+payLabel[p]+'</div></div>'+
       '<div class="amt"><div class="net">'+fmtEur(byPay[p])+'</div></div></div>'
     ).join('')+'</div>';
 
-  /* totaux par type de course */
+  /* totaux par type de course (avec détail cash / virement pour Uber & Bolt) */
   const bySrc = computeMonthBySource(mk);
   $('monthBySrc').innerHTML = !bySrc.length ? '' :
     '<div class="bysrc-title">Par type de course</div><div class="bysrc-list">'+
-    bySrc.map(s=>
-      '<div class="item"><div class="who"><div class="l1">'+esc(s.name)+'</div>'+
-      '<div class="l2">'+s.count+' course'+(s.count>1?'s':'')+' · brut '+fmtEur(s.brut)+'</div></div>'+
-      '<div class="amt"><div class="net">'+fmtEur(s.net)+'</div><div class="brut">net</div></div></div>'
-    ).join('')+'</div>';
+    bySrc.map(s=>{
+      let sub;
+      if(s.appCash){
+        const bits=['cash '+fmtEur(s.parts.cash), 'virement '+fmtEur(s.parts.app)];
+        if(Math.abs(s.parts.cheque)>0.001) bits.push('chèque '+fmtEur(s.parts.cheque));
+        if(Math.abs(s.parts.sumup)>0.001)  bits.push('SumUp '+fmtEur(s.parts.sumup));
+        sub = bits.join(' · ');
+      }else{
+        const bits=[];
+        if(Math.abs(s.parts.cash)>0.001)   bits.push('cash '+fmtEur(s.parts.cash));
+        if(Math.abs(s.parts.app)>0.001)    bits.push('facturé '+fmtEur(s.parts.app));
+        if(Math.abs(s.parts.cheque)>0.001) bits.push('chèque '+fmtEur(s.parts.cheque));
+        if(Math.abs(s.parts.sumup)>0.001)  bits.push('SumUp '+fmtEur(s.parts.sumup));
+        sub = (bits.length?bits.join(' · ')+' · ':'')+s.count+' course'+(s.count>1?'s':'');
+      }
+      return '<div class="item"><div class="who"><div class="l1">'+esc(s.name)+'</div>'+
+      '<div class="l2">'+sub+'</div></div>'+
+      '<div class="amt"><div class="net">'+fmtEur(s.net)+'</div><div class="brut">'+(s.appCash?'sur l\'app':'net')+'</div></div></div>';
+    }).join('')+'</div>';
 
   const keys = m.keys.slice().reverse();
   if(!keys.length){
@@ -853,8 +944,10 @@ function renderSettings(){
   $('srcSettings').innerHTML = db.sources.map(s=>
     '<div class="src-row">'+
     '<input type="text" class="srcname" value="'+esc(s.name)+'" data-name="'+esc(s.id)+'" aria-label="Nom de la source">'+
-    '<input type="text" class="srate" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
-    '<span class="pct">%</span>'+
+    (s.appCash
+      ? '<span class="pct" style="min-width:auto;font-size:12px;white-space:nowrap;color:var(--text2)">app + cash</span>'
+      : '<input type="text" class="srate" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
+        '<span class="pct">%</span>')+
     '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>'+
     '</div>'
   ).join('');
@@ -875,15 +968,22 @@ function renderSettings(){
 function renderQuickRows(){
   const el = $('quickRows');
   if(!el) return;
-  el.innerHTML = db.sources.map(s=>
-    '<div class="quick-grid">'+
-    '<div class="qname">'+esc(s.name)+'</div>'+
-    '<input type="text" inputmode="decimal" data-qamt="'+esc(s.id)+'" placeholder="Total €" aria-label="Total '+esc(s.name)+'">'+
-    '<select data-qpay="'+esc(s.id)+'" aria-label="Paiement '+esc(s.name)+'">'+
-      '<option value="app">Facturé</option><option value="cash">Cash</option><option value="sumup">SumUp</option><option value="cheque">Chèque</option>'+
-    '</select>'+
-    '</div>'
-  ).join('');
+  el.innerHTML = db.sources.map(s=>{
+    if(s.appCash){
+      return '<div class="quick-grid appcash">'+
+        '<div class="qname">'+esc(s.name)+'</div>'+
+        '<input type="text" inputmode="decimal" data-qapp="'+esc(s.id)+'" placeholder="Sur l\'app €" aria-label="Total sur l\'app '+esc(s.name)+'">'+
+        '<input type="text" inputmode="decimal" data-qcash="'+esc(s.id)+'" placeholder="Cash €" aria-label="Cash encaissé '+esc(s.name)+'">'+
+        '</div>';
+    }
+    return '<div class="quick-grid">'+
+      '<div class="qname">'+esc(s.name)+'</div>'+
+      '<input type="text" inputmode="decimal" data-qamt="'+esc(s.id)+'" placeholder="Total €" aria-label="Total '+esc(s.name)+'">'+
+      '<select data-qpay="'+esc(s.id)+'" aria-label="Paiement '+esc(s.name)+'">'+
+        '<option value="app">Facturé</option><option value="cash">Cash</option><option value="sumup">SumUp</option><option value="cheque">Chèque</option>'+
+      '</select>'+
+      '</div>';
+  }).join('');
 }
 function renderTaxi(){
   document.querySelectorAll('.tmode').forEach(b=>b.classList.toggle('on', b.dataset.tmode===db.taxi.mode));
@@ -986,6 +1086,28 @@ $('addRide').addEventListener('click', ()=>{
   if(ok) toast('Course '+sourceName(state.src)+' ajoutée — '+fmtEur(amt));
 });
 $('amount').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRide').click(); } });
+$('addRideAC').addEventListener('click', ()=>{
+  const A = parseAmount($('amountApp').value);
+  if(isNaN(A)){ toast('Entre le total sur l\'app'); $('amountApp').focus(); return; }
+  let C = parseAmount($('amountCash').value);
+  if(isNaN(C)) C = 0;
+  const d = getDay(state.date);
+  const stampTime = state.date===todayKey() || (db.activeDay===state.date && state.date===yesterdayKey());
+  d.rides.push({
+    id: 'r'+Date.now()+Math.floor(Math.random()*1000),
+    t: stampTime ? nowHM() : '',
+    src: state.src,
+    srcName: sourceName(state.src),
+    pay: 'appcash',
+    amt: A, cash: C, rate: 0
+  });
+  const ok = saveDb();
+  $('amountApp').value=''; $('amountCash').value='';
+  renderDay();
+  if(ok) toast(sourceName(state.src)+' — sur l\'app '+fmtEur(A)+', cash '+fmtEur(C));
+});
+$('amountApp').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('amountCash').focus(); } });
+$('amountCash').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRideAC').click(); } });
 
 $('quickToggle').addEventListener('click', ()=>{
   const f = $('quickForm');
@@ -994,8 +1116,38 @@ $('quickToggle').addEventListener('click', ()=>{
 });
 $('quickAdd').addEventListener('click', ()=>{
   const d = getDay(state.date);
+  /* pré-contrôle : cash rempli mais « Sur l'app » vide sur une source app+cash */
+  const bad = [];
+  db.sources.forEach(s=>{
+    if(!s.appCash) return;
+    const a = document.querySelector('[data-qapp="'+CSS.escape(s.id)+'"]');
+    const c = document.querySelector('[data-qcash="'+CSS.escape(s.id)+'"]');
+    if(a && isNaN(parseAmount(a.value)) && c && String(c.value).trim()!=='') bad.push({name:s.name, inp:a});
+  });
+  if(bad.length){
+    toast('Entre d\'abord le « Sur l\'app » pour '+bad.map(b=>b.name).join(', '));
+    bad[0].inp.focus();
+    return;
+  }
   let added=0, net=0;
   db.sources.forEach(s=>{
+    if(s.appCash){
+      const appInp = document.querySelector('[data-qapp="'+CSS.escape(s.id)+'"]');
+      const cashInp = document.querySelector('[data-qcash="'+CSS.escape(s.id)+'"]');
+      if(!appInp) return;
+      const A = parseAmount(appInp.value);
+      if(isNaN(A)) return;                       /* il faut le total sur l'app */
+      let C = parseAmount(cashInp && cashInp.value);
+      if(isNaN(C)) C = 0;                          /* cash optionnel (0 = tout facturé) */
+      d.rides.push({
+        id:'r'+Date.now()+Math.floor(Math.random()*1000)+added,
+        t:'', src:s.id, srcName:s.name, pay:'appcash', amt:A, cash:C, rate:0
+      });
+      net += A;
+      appInp.value=''; if(cashInp) cashInp.value='';
+      added++;
+      return;
+    }
     const inp = document.querySelector('[data-qamt="'+CSS.escape(s.id)+'"]');
     const sel = document.querySelector('[data-qpay="'+CSS.escape(s.id)+'"]');
     if(!inp) return;
@@ -1144,6 +1296,7 @@ $('srcSettings').addEventListener('click', e=>{
   if(!b) return;
   const s = sourceOf(b.dataset.delSrc);
   if(!s) return;
+  if(db.sources.length<=1){ toast('Garde au moins une source'); return; }
   if(!confirm('Supprimer la source « '+s.name+' » ? Les anciennes courses garderont leur montant et leur nom.')) return;
   db.sources = db.sources.filter(x=>x.id!==s.id);
   if(state.src===s.id) state.src = db.sources.length ? db.sources[0].id : 'uber';
@@ -1155,11 +1308,12 @@ $('addSrcBtn').addEventListener('click', ()=>{
   let rate = Number(String($('newSrcRate').value).trim().replace(',','.'));
   if(!isFinite(rate)) rate = 0;
   rate = Math.min(100, Math.max(0, rate));
-  db.sources.push({id:'c'+Date.now(), name, rate, builtin:false});
+  const appCash = $('newSrcAppCash').checked;
+  db.sources.push({id:'c'+Date.now(), name, rate: appCash?0:rate, builtin:false, appCash});
   const ok = saveDb();
-  $('newSrcName').value=''; $('newSrcRate').value='';
+  $('newSrcName').value=''; $('newSrcRate').value=''; $('newSrcAppCash').checked=false;
   renderAll();
-  if(ok) toast('Source « '+name+' » ajoutée ('+nf.format(rate)+' %)');
+  if(ok) toast('Source « '+name+' » ajoutée'+(appCash?' (app + cash)':' ('+nf.format(rate)+' %)'));
 });
 
 /* ---------- téléchargement (feuille de partage iOS d'abord, lien sinon) ---------- */
@@ -1298,10 +1452,21 @@ function makePdf(dateKey, day){
       text(X.n, y, String(i+1), 10, false);
       text(X.h, y, r.t || '—', 10, false);
       text(X.s, y, rideSrcName(r), 10, false);
-      text(X.p, y, PAY_LABEL[r.pay] + (r.pay!=='app' && rideRate(r)>0 ? ' (-'+nf.format(rideRate(r))+' %)' : ''), 10, false);
-      text(X.m, y, eurPdf(r.amt), 10, false);
-      text(X.net, y, eurPdf(net), 10, true);
-      y -= 16;
+      if(r.pay==='appcash'){
+        const C = Math.round((Number(r.cash)||0)*100)/100;
+        const vir = Math.round((r.amt - C)*100)/100;
+        text(X.p, y, 'Sur l\'app', 10, false);
+        text(X.m, y, eurPdf(r.amt), 10, false);
+        text(X.net, y, eurPdf(net), 10, true);
+        y -= 12;
+        text(X.s, y, 'cash '+eurPdf(C)+'  ·  virement '+eurPdf(vir), 8.5, false, true);
+        y -= 15;
+      }else{
+        text(X.p, y, PAY_LABEL[r.pay] + (r.pay!=='app' && !sourceIsAppCash(r.src) && rideRate(r)>0 ? ' (-'+nf.format(rideRate(r))+' %)' : ''), 10, false);
+        text(X.m, y, eurPdf(r.amt), 10, false);
+        text(X.net, y, eurPdf(net), 10, true);
+        y -= 16;
+      }
     });
     y -= 6;
   }
@@ -1465,13 +1630,13 @@ function makeMonthPdf(mk){
     y -= 10;
   }
 
-  /* par mode de paiement (cash / facturé) */
+  /* encaissements : cash / facturé (virement) */
   const byPay = computeMonthByPayment(mk);
-  const payRowsPdf = [['cash','Cash'],['sumup','SumUp'],['cheque','Chèque taxi'],['app','Facturé / App']]
-    .filter(x=>byPay[x[0]]>0.0001);
+  const payRowsPdf = [['cash','Cash (en poche)'],['app','Facturé / virement'],['cheque','Chèque taxi'],['sumup','SumUp']]
+    .filter(x=>Math.abs(byPay[x[0]])>0.0001);
   if(payRowsPdf.length){
     needs(40 + payRowsPdf.length*16);
-    section('Par mode de paiement (net)');
+    section('Encaissements du mois (net)');
     payRowsPdf.forEach(([p,lab])=>{
       if(y < 70) newPage();
       text(M, y, lab, 11, false);
