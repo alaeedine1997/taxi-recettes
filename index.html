@@ -160,9 +160,6 @@ input:disabled{opacity:.55}
 .quick-grid input{min-height:46px}
 .quick-grid select{min-height:46px;font-size:15px;padding:8px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);appearance:none;-webkit-appearance:none}
 .taxicard{text-align:center}
-.taxi-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--chip-bg);border-radius:12px;padding:4px;margin-bottom:16px}
-.tmode{border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:700;padding:10px 4px;border-radius:9px;cursor:pointer;min-height:44px}
-.tmode.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.15)}
 /* compteur de taxi — afficheur digital type "à bord" */
 .taxi-meter{background:radial-gradient(130% 120% at 50% 0%, #121821 0%, #05070b 72%);border:1px solid #232d3b;border-radius:16px;padding:12px 16px 14px;margin:4px 0 12px;box-shadow:inset 0 3px 12px rgba(0,0,0,.8), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 2px rgba(0,0,0,.4)}
 .tm-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
@@ -361,10 +358,6 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 <!-- ===================== TAXIMÈTRE ===================== -->
 <section class="view" id="view-taxi">
   <div class="card taxicard">
-    <div class="taxi-mode">
-      <button type="button" class="tmode on" data-tmode="non_reservee">Compteur (non réservé)</button>
-      <button type="button" class="tmode" data-tmode="reservee">Réservé</button>
-    </div>
     <div class="taxi-meter">
       <div class="tm-head">
         <span class="tm-brand">● TAXI</span>
@@ -426,13 +419,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   <div class="card">
     <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12l3-3"/><path d="M12 3v2"/></svg>Taximètre — tarifs</h2>
     <div id="taxiSettings"></div>
-    <label class="fld">Méthode de calcul</label>
-    <div class="seg" id="taxiMethode" style="grid-template-columns:1fr 1fr">
-      <button type="button" data-tmeth="S">Bascule (un tarif)</button>
-      <button type="button" data-tmeth="D">Cumul km + temps</button>
-    </div>
     <button type="button" class="btn btn-ghost btn-full" id="taxiPresetBxl" style="margin-top:10px">Réinitialiser aux tarifs Bruxelles 2026</button>
-    <div class="note">Tarifs officiels Bruxelles (course non réservée) par défaut : 2,60 € + 2,30 €/km + attente 0,60 €/min, min. 8 €, nuit +2 €. Ajuste selon ton compteur réel. « Bascule » = km OU temps selon la vitesse (compteur légal) ; « Cumul » = km ET temps ensemble.</div>
+    <div class="note">Le compteur bascule tout seul entre le tarif au km (en roulant) et le tarif d'attente (à l'arrêt). Défaut Bruxelles : 2,60 € + 2,30 €/km + attente 0,60 €/min, minimum 8 €. Ajuste selon ton compteur réel.</div>
   </div>
 
   <div class="card">
@@ -959,16 +947,13 @@ function renderSettings(){
   $('fuelRate').value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
   const TAXI_FIELDS = [
     ['priseEnCharge','Prise en charge','€'],['tarifKm','Tarif au km','€/km'],
-    ['tarifMinute','Tarif attente','€/min'],['minimumCourse','Minimum course','€'],
-    ['supplementNuit','Supplément nuit','€'],['nuitDebut','Nuit de','h'],
-    ['nuitFin','Nuit à','h'],['sautCompteur','Saut compteur','€']
+    ['tarifMinute','Tarif attente','€/min'],['minimumCourse','Minimum course','€']
   ];
   $('taxiSettings').innerHTML = TAXI_FIELDS.map(([k,lab,unit])=>
     '<div class="src-row"><div style="flex:1;font-weight:600;font-size:15px">'+lab+'</div>'+
     '<input type="text" class="srate" inputmode="decimal" value="'+String(db.taxi[k]).replace('.',',')+'" data-taxi="'+k+'" aria-label="'+lab+'">'+
     '<span class="pct" style="min-width:40px">'+unit+'</span></div>'
   ).join('');
-  document.querySelectorAll('#taxiMethode button').forEach(b=>b.classList.toggle('on', b.dataset.tmeth===db.taxi.methode));
 }
 function renderQuickRows(){
   const el = $('quickRows');
@@ -991,7 +976,6 @@ function renderQuickRows(){
   }).join('');
 }
 function renderTaxi(){
-  document.querySelectorAll('.tmode').forEach(b=>b.classList.toggle('on', b.dataset.tmode===db.taxi.mode));
   if(!taxi.isRunning()) taxi.reset();
 }
 function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); renderQuickRows(); renderTaxi(); }
@@ -1259,18 +1243,9 @@ $('taxiSettings').addEventListener('change', e=>{
   const ok = saveDb(); renderTaxi();
   if(ok) toast('Tarif mis à jour');
 });
-document.querySelectorAll('#taxiMethode button').forEach(b=>{
-  b.addEventListener('click', ()=>{
-    db.taxi.methode = b.dataset.tmeth; saveDb();
-    document.querySelectorAll('#taxiMethode button').forEach(x=>x.classList.toggle('on', x===b));
-    toast('Méthode : '+(b.dataset.tmeth==='S'?'bascule':'cumul km+temps'));
-  });
-});
 $('taxiPresetBxl').addEventListener('click', ()=>{
-  if(!confirm('Remettre les tarifs officiels Bruxelles 2026 (non réservé) ?')) return;
-  const mode = db.taxi.mode;
+  if(!confirm('Remettre les tarifs officiels Bruxelles 2026 ?')) return;
   db.taxi = JSON.parse(JSON.stringify(DEFAULT_TAXI));
-  db.taxi.mode = mode;
   saveDb(); renderSettings(); renderTaxi();
   toast('Tarifs Bruxelles rétablis');
 });
@@ -1671,13 +1646,11 @@ const taxi = (function(){
     return 2*R*Math.asin(Math.sqrt(s));
   }
   const c=()=>db.taxi;
-  function estNuit(){ const t=c(), h=new Date().getHours(); return t.nuitDebut>t.nuitFin ? (h>=t.nuitDebut||h<t.nuitFin) : (h>=t.nuitDebut&&h<t.nuitFin); }
   /* applyMin=false : prix qui monte en direct (depuis la prise en charge).
      applyMin=true  : prix final — on applique le minimum de course (fin de course). */
   function priceNow(applyMin){
     const t=c();
     let p = applyMin ? Math.max(total, t.minimumCourse) : total;
-    if(t.mode==='non_reservee' && estNuit()) p+=t.supplementNuit;
     const saut=t.sautCompteur>0?t.sautCompteur:0.10;
     return Math.round(p/saut)*saut;
   }
@@ -1697,7 +1670,7 @@ const taxi = (function(){
         if((dd/dt)*3.6 < t.vitesseMinRoule) dd=0;
         distanceM+=dd;
         const compKm=t.tarifKm*(dd/1000), compMin=t.tarifMinute*(dt/60);
-        total += t.methode==='D' ? compKm+compMin : Math.max(compKm,compMin);
+        total += Math.max(compKm,compMin);   /* bascule : le tarif le plus élevé entre km et attente */
         tarifNow = compMin>compKm ? 'temps' : 'km';
       }
     }
@@ -1758,7 +1731,6 @@ const taxi = (function(){
   return {
     start, stop, reset, addToCarnet, renderAdd,
     isRunning:()=>running,
-    setMode:(m)=>{ db.taxi.mode=m; saveDb(); document.querySelectorAll('.tmode').forEach(b=>b.classList.toggle('on', b.dataset.tmode===m)); if(!running) reset(); },
     setAddSrc:(s)=>{ addSrc=s; renderAdd(); },
     setAddPay:(p)=>{ addPay=p; renderAdd(); }
   };
@@ -1767,7 +1739,6 @@ $('taxiStart').addEventListener('click', ()=>taxi.start());
 $('taxiStop').addEventListener('click', ()=>taxi.stop());
 $('taxiReset').addEventListener('click', ()=>taxi.reset());
 $('taxiAdd').addEventListener('click', ()=>taxi.addToCarnet());
-document.querySelectorAll('.tmode').forEach(b=> b.addEventListener('click', ()=>taxi.setMode(b.dataset.tmode)));
 $('taxiSrcChips').addEventListener('click', e=>{ const b=e.target.closest('[data-taxisrc]'); if(b) taxi.setAddSrc(b.dataset.taxisrc); });
 $('taxiPaySeg').addEventListener('click', e=>{ const b=e.target.closest('[data-tpay]'); if(b) taxi.setAddPay(b.dataset.tpay); });
 
