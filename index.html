@@ -286,14 +286,6 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
           Ajouter
         </button>
       </div>
-      <div class="amount-row ac2 hidden" id="appcashRow">
-        <input type="text" id="amountApp" inputmode="decimal" placeholder="Sur l'app €" aria-label="Total sur l'app">
-        <input type="text" id="amountCash" inputmode="decimal" placeholder="Cash €" aria-label="Cash encaissé">
-        <button type="button" class="btn btn-accent" id="addRideAC">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-          Ajouter
-        </button>
-      </div>
     </div>
 
     <div id="quickWrap">
@@ -805,11 +797,13 @@ function renderDay(){
     '<button type="button" role="radio" aria-checked="'+(s.id===state.src)+'" class="chip'+(s.id===state.src?' on':'')+'" data-src="'+esc(s.id)+'">'+esc(s.name)+'</button>'
   ).join('');
 
-  /* formulaire adapté : Uber/Bolt (app+cash) → 2 champs ; autres → paiement + montant */
+  /* Uber/Bolt : course par course avec paiement limité à « Sur l'app » ou « Cash »
+     (pas de SumUp/Chèque, pas de commission). Les totaux se saisissent via « Saisie rapide ». */
   const isAC = sourceIsAppCash(state.src);
-  show('payWrap', !isAC);
-  show('amountRow', !isAC);
-  show('appcashRow', isAC);
+  document.querySelector('#paySeg [data-pay="sumup"]').classList.toggle('hidden', isAC);
+  document.querySelector('#paySeg [data-pay="cheque"]').classList.toggle('hidden', isAC);
+  document.querySelector('#paySeg [data-pay="app"]').textContent = isAC ? 'Sur l\'app' : 'App / Facturé';
+  if(isAC && (state.pay==='sumup' || state.pay==='cheque')) state.pay = 'app';
 
   /* segmented paiement */
   document.querySelectorAll('#paySeg button').forEach(b=>{
@@ -1086,28 +1080,6 @@ $('addRide').addEventListener('click', ()=>{
   if(ok) toast('Course '+sourceName(state.src)+' ajoutée — '+fmtEur(amt));
 });
 $('amount').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRide').click(); } });
-$('addRideAC').addEventListener('click', ()=>{
-  const A = parseAmount($('amountApp').value);
-  if(isNaN(A)){ toast('Entre le total sur l\'app'); $('amountApp').focus(); return; }
-  let C = parseAmount($('amountCash').value);
-  if(isNaN(C)) C = 0;
-  const d = getDay(state.date);
-  const stampTime = state.date===todayKey() || (db.activeDay===state.date && state.date===yesterdayKey());
-  d.rides.push({
-    id: 'r'+Date.now()+Math.floor(Math.random()*1000),
-    t: stampTime ? nowHM() : '',
-    src: state.src,
-    srcName: sourceName(state.src),
-    pay: 'appcash',
-    amt: A, cash: C, rate: 0
-  });
-  const ok = saveDb();
-  $('amountApp').value=''; $('amountCash').value='';
-  renderDay();
-  if(ok) toast(sourceName(state.src)+' — sur l\'app '+fmtEur(A)+', cash '+fmtEur(C));
-});
-$('amountApp').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('amountCash').focus(); } });
-$('amountCash').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('addRideAC').click(); } });
 
 $('quickToggle').addEventListener('click', ()=>{
   const f = $('quickForm');
