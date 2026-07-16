@@ -163,9 +163,15 @@ input:disabled{opacity:.55}
 .taxi-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--chip-bg);border-radius:12px;padding:4px;margin-bottom:16px}
 .tmode{border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:700;padding:10px 4px;border-radius:9px;cursor:pointer;min-height:44px}
 .tmode.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.15)}
-.taxi-price{font-size:58px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--accent);line-height:1.1;margin:6px 0}
-.taxi-sub{display:flex;justify-content:space-around;color:var(--text2);font-size:15px;font-weight:600;margin-bottom:10px}
-.taxi-sub span{color:var(--text);font-variant-numeric:tabular-nums}
+/* compteur de taxi — afficheur digital type "à bord" */
+.taxi-meter{background:radial-gradient(130% 120% at 50% 0%, #121821 0%, #05070b 72%);border:1px solid #232d3b;border-radius:16px;padding:12px 16px 14px;margin:4px 0 12px;box-shadow:inset 0 3px 12px rgba(0,0,0,.8), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 2px rgba(0,0,0,.4)}
+.tm-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.tm-brand{font-size:11px;font-weight:800;letter-spacing:2px;color:#8a5a12}
+.tm-tarif{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#120a02;background:#FFB020;padding:3px 8px;border-radius:5px;box-shadow:0 0 10px rgba(255,176,32,.55)}
+.tm-price{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace;font-size:58px;font-weight:800;letter-spacing:1px;line-height:1.06;font-variant-numeric:tabular-nums;color:#FFB020;text-shadow:0 0 14px rgba(255,176,32,.5), 0 0 3px rgba(255,176,32,.85);margin:2px 0 6px}
+.tm-sub{display:flex;justify-content:space-around;border-top:1px solid #1b2431;padding-top:7px}
+.tm-cell{font-family:ui-monospace,Menlo,Consolas,'Courier New',monospace;color:#6b7683;font-size:11px;letter-spacing:.5px}
+.tm-cell b{color:#e8b661;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 0 6px rgba(232,182,97,.35)}
 .taxi-gps{font-size:12.5px;color:var(--text2);margin-bottom:14px}
 .taxi-gps.live{color:var(--accent);font-weight:600}
 .taxi-gps.err{color:var(--danger)}
@@ -359,11 +365,16 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <button type="button" class="tmode on" data-tmode="non_reservee">Compteur (non réservé)</button>
       <button type="button" class="tmode" data-tmode="reservee">Réservé</button>
     </div>
-    <div class="taxi-price" id="taxiPrice">2,60 €</div>
-    <div class="taxi-sub">
-      <div><span id="taxiKm">0,00</span> km</div>
-      <div><span id="taxiTime">00:00</span></div>
-      <div id="taxiTarif">Tarif km</div>
+    <div class="taxi-meter">
+      <div class="tm-head">
+        <span class="tm-brand">● TAXI</span>
+        <span class="tm-tarif" id="taxiTarif">Tarif km</span>
+      </div>
+      <div class="tm-price" id="taxiPrice">2,60 €</div>
+      <div class="tm-sub">
+        <div class="tm-cell"><b id="taxiKm">0,00</b> <span>km</span></div>
+        <div class="tm-cell"><b id="taxiTime">00:00</b> <span>durée</span></div>
+      </div>
     </div>
     <div class="taxi-gps" id="taxiGps">GPS : en attente…</div>
     <button type="button" class="btn btn-accent btn-full btn-big" id="taxiStart">
@@ -376,7 +387,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     </button>
 
     <div id="taxiDone" class="hidden">
-      <div class="note" style="text-align:center;font-size:15px">Course terminée — <strong id="taxiFinal"></strong> (<span id="taxiFinalKm"></span> km)</div>
+      <div class="note" style="text-align:center;font-size:15px">Course terminée — <strong id="taxiFinal"></strong> (<span id="taxiFinalKm"></span> km)<span id="taxiMinNote"></span></div>
       <label class="fld">Ajouter au carnet — source</label>
       <div class="chips" id="taxiSrcChips" role="radiogroup" aria-label="Source"></div>
       <label class="fld">Paiement</label>
@@ -1661,12 +1672,17 @@ const taxi = (function(){
   }
   const c=()=>db.taxi;
   function estNuit(){ const t=c(), h=new Date().getHours(); return t.nuitDebut>t.nuitFin ? (h>=t.nuitDebut||h<t.nuitFin) : (h>=t.nuitDebut&&h<t.nuitFin); }
-  function priceNow(){
-    const t=c(); let p=Math.max(total, t.minimumCourse);
+  /* applyMin=false : prix qui monte en direct (depuis la prise en charge).
+     applyMin=true  : prix final — on applique le minimum de course (fin de course). */
+  function priceNow(applyMin){
+    const t=c();
+    let p = applyMin ? Math.max(total, t.minimumCourse) : total;
     if(t.mode==='non_reservee' && estNuit()) p+=t.supplementNuit;
     const saut=t.sautCompteur>0?t.sautCompteur:0.10;
     return Math.round(p/saut)*saut;
   }
+  /* le minimum a-t-il rehaussé le prix ? (pour l'info de fin de course) */
+  function minApplique(){ const t=c(); return total < t.minimumCourse; }
   function setGps(msg, cls){ const el=$('taxiGps'); if(el){ el.textContent='GPS : '+msg; el.className='taxi-gps'+(cls?' '+cls:''); } }
   function onPos(pos){
     if(!running) return;
@@ -1689,7 +1705,7 @@ const taxi = (function(){
   }
   function tick(){
     if(!running) return;
-    $('taxiPrice').textContent=fmtEur(priceNow());
+    $('taxiPrice').textContent=fmtEur(priceNow(false));
     $('taxiKm').textContent=nf.format(Math.round(distanceM/10)/100);
     const s=Math.floor((Date.now()-startAt)/1000);
     $('taxiTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
@@ -1710,15 +1726,19 @@ const taxi = (function(){
     if(timer){ clearInterval(timer); timer=null; }
     try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(_){ }
     $('taxiStop').classList.add('hidden');
-    $('taxiFinal').textContent=fmtEur(priceNow());
+    const fin=priceNow(true);
+    $('taxiPrice').textContent=fmtEur(fin);           /* le compteur affiche le prix final (minimum inclus) */
+    $('taxiFinal').textContent=fmtEur(fin);
     $('taxiFinalKm').textContent=nf.format(Math.round(distanceM/10)/100);
+    const mn=$('taxiMinNote');
+    if(mn) mn.innerHTML = minApplique() ? '<br><span style="color:var(--text2);font-size:13px">Minimum de '+fmtEur(c().minimumCourse)+' appliqué</span>' : '';
     $('taxiDone').classList.remove('hidden');
     renderAdd();
   }
   function reset(){
     running=false; total=c().priseEnCharge; distanceM=0; last=null; tarifNow='km';
     $('taxiDone').classList.add('hidden'); $('taxiStop').classList.add('hidden'); $('taxiStart').classList.remove('hidden');
-    $('taxiPrice').textContent=fmtEur(priceNow()); $('taxiKm').textContent='0,00'; $('taxiTime').textContent='00:00';
+    $('taxiPrice').textContent=fmtEur(priceNow(false)); $('taxiKm').textContent='0,00'; $('taxiTime').textContent='00:00';
     $('taxiTarif').textContent='Tarif km'; setGps('en attente…','');
   }
   function renderAdd(){
@@ -1728,7 +1748,7 @@ const taxi = (function(){
     document.querySelectorAll('#taxiPaySeg button').forEach(b=>b.classList.toggle('on', b.dataset.tpay===addPay));
   }
   function addToCarnet(){
-    const price=priceNow();
+    const price=priceNow(true);
     const d=getDay(state.date);
     d.rides.push({id:'r'+Date.now()+Math.floor(Math.random()*1000), t: state.date===todayKey()?nowHM():'', src:addSrc, srcName:sourceName(addSrc), pay:addPay, amt:price, rate: addPay==='app'?0:rateOf(addSrc)});
     const ok=saveDb(); renderDay();
