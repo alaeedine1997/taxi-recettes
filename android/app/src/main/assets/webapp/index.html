@@ -975,7 +975,7 @@ function renderQuickRows(){
   }).join('');
 }
 function renderTaxi(){
-  if(!taxi.isRunning()) taxi.reset();
+  taxi.onShow();
 }
 function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings(); renderQuickRows(); renderTaxi(); }
 
@@ -1638,6 +1638,10 @@ const taxi = (function(){
   let watchId=null, wakeLock=null, running=false, timer=null;
   let total=0, distanceM=0, last=null, startAt=0, tarifNow='km';
   let addSrc='taxivert', addPay='cash';
+  /* Dans l'app Android : compteur NATIF (GPS en arrière-plan + bulle flottante).
+     Dans un navigateur (iPhone/PC) : repli sur le GPS du navigateur (ci-dessous). */
+  const NATIVE = (function(){ try{ return !!(window.TaxiNative && TaxiNative.hasNativeMeter && TaxiNative.hasNativeMeter()); }catch(_){ return false; } })();
+  let pollTimer=null, lastFinal=0, lastKm=0, lastMin=false;
   const R=6371000, toRad=d=>d*Math.PI/180;
   function haversine(a,b){
     const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon);
@@ -1683,7 +1687,7 @@ const taxi = (function(){
     $('taxiTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
     $('taxiTarif').textContent = tarifNow==='temps'?'Tarif attente':'Tarif km';
   }
-  async function start(){
+  async function startWeb(){
     if(!navigator.geolocation){ toast('GPS non disponible sur cet appareil'); return; }
     total=c().priseEnCharge; distanceM=0; last=null; startAt=Date.now(); running=true; tarifNow='km';
     $('taxiStart').classList.add('hidden'); $('taxiStop').classList.remove('hidden'); $('taxiDone').classList.add('hidden');
@@ -1692,26 +1696,32 @@ const taxi = (function(){
     watchId=navigator.geolocation.watchPosition(onPos, e=>setGps('autorise la localisation ('+e.code+')','err'), {enableHighAccuracy:true, maximumAge:0, timeout:10000});
     timer=setInterval(tick,1000); tick();
   }
-  function stop(){
+  function stopWeb(){
     running=false;
     if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
     if(timer){ clearInterval(timer); timer=null; }
     try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(_){ }
+    lastFinal=priceNow(true); lastKm=Math.round(distanceM/10)/100; lastMin=minApplique();
+    showDone();
+  }
+  /* affiche le panneau "course terminée" à partir de lastFinal/lastKm/lastMin */
+  function showDone(){
     $('taxiStop').classList.add('hidden');
-    const fin=priceNow(true);
-    $('taxiPrice').textContent=fmtEur(fin);           /* le compteur affiche le prix final (minimum inclus) */
-    $('taxiFinal').textContent=fmtEur(fin);
-    $('taxiFinalKm').textContent=nf.format(Math.round(distanceM/10)/100);
+    $('taxiPrice').textContent=fmtEur(lastFinal);       /* le compteur affiche le prix final (minimum inclus) */
+    $('taxiFinal').textContent=fmtEur(lastFinal);
+    $('taxiFinalKm').textContent=nf.format(lastKm);
     const mn=$('taxiMinNote');
-    if(mn) mn.innerHTML = minApplique() ? '<br><span style="color:var(--text2);font-size:13px">Minimum de '+fmtEur(c().minimumCourse)+' appliqué</span>' : '';
+    if(mn) mn.innerHTML = lastMin ? '<br><span style="color:var(--text2);font-size:13px">Minimum de '+fmtEur(c().minimumCourse)+' appliqué</span>' : '';
     $('taxiDone').classList.remove('hidden');
     renderAdd();
   }
   function reset(){
-    running=false; total=c().priseEnCharge; distanceM=0; last=null; tarifNow='km';
+    running=false;
+    if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+    total=c().priseEnCharge; distanceM=0; last=null; tarifNow='km';
     $('taxiDone').classList.add('hidden'); $('taxiStop').classList.add('hidden'); $('taxiStart').classList.remove('hidden');
     $('taxiPrice').textContent=fmtEur(priceNow(false)); $('taxiKm').textContent='0,00'; $('taxiTime').textContent='00:00';
-    $('taxiTarif').textContent='Tarif km'; setGps('en attente…','');
+    $('taxiTarif').textContent='Tarif km'; setGps(NATIVE?'prêt':'en attente…','');
   }
   function renderAdd(){
     if(!sourceOf(addSrc)) addSrc = sourceOf('taxivert') ? 'taxivert' : (db.sources[0] && db.sources[0].id);
@@ -1720,15 +1730,67 @@ const taxi = (function(){
     document.querySelectorAll('#taxiPaySeg button').forEach(b=>b.classList.toggle('on', b.dataset.tpay===addPay));
   }
   function addToCarnet(){
-    const price=priceNow(true);
+    const price=lastFinal;
     const d=getDay(state.date);
     d.rides.push({id:'r'+Date.now()+Math.floor(Math.random()*1000), t: state.date===todayKey()?nowHM():'', src:addSrc, srcName:sourceName(addSrc), pay:addPay, amt:price, rate: addPay==='app'?0:rateOf(addSrc)});
     const ok=saveDb(); renderDay();
     if(ok) toast('Course ajoutée — '+fmtEur(price));
     reset();
   }
+
+  /* ---------- chemin NATIF (Android : arrière-plan + bulle) ---------- */
+  function tariffsJson(){ const t=c(); return JSON.stringify({priseEnCharge:t.priseEnCharge, tarifKm:t.tarifKm, tarifMinute:t.tarifMinute, minimumCourse:t.minimumCourse, sautCompteur:t.sautCompteur, vitesseMinRoule:t.vitesseMinRoule, precisionMax:t.precisionMax}); }
+  function nativePoll(){
+    let st; try{ st=JSON.parse(TaxiNative.meterState()); }catch(_){ return; }
+    if(!st || st.running===false){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } running=false; return; }
+    $('taxiPrice').textContent=fmtEur(st.price||0);
+    $('taxiKm').textContent=nf.format(st.km||0);
+    const s=st.seconds|0;
+    $('taxiTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+    $('taxiTarif').textContent = st.tarif==='temps'?'Tarif attente':'Tarif km';
+  }
+  function startNative(){
+    try{
+      if(TaxiNative.canOverlay && !TaxiNative.canOverlay()){ TaxiNative.requestOverlay(); toast('Autorise « afficher par-dessus les autres apps » pour la bulle'); }
+      TaxiNative.startMeter(tariffsJson());
+    }catch(_){ toast('Impossible de démarrer le compteur'); return; }
+    running=true;
+    $('taxiStart').classList.add('hidden'); $('taxiStop').classList.remove('hidden'); $('taxiDone').classList.add('hidden');
+    setGps('actif — continue en arrière-plan','live');
+    if(pollTimer) clearInterval(pollTimer);
+    pollTimer=setInterval(nativePoll,1000); nativePoll();
+  }
+  function stopNative(){
+    let res={}; try{ res=JSON.parse(TaxiNative.stopMeter()); }catch(_){ }
+    running=false; if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+    lastFinal=res.price!=null?res.price:0; lastKm=res.km!=null?res.km:0; lastMin=!!res.minApplied;
+    showDone();
+  }
+  /* à l'affichage de l'onglet : si le compteur natif tourne déjà (arrière-plan), reprendre l'UI en cours */
+  function resumeNative(){
+    if(!NATIVE) return false;
+    let st; try{ st=JSON.parse(TaxiNative.meterState()); }catch(_){ return false; }
+    if(st && st.running){
+      running=true;
+      $('taxiStart').classList.add('hidden'); $('taxiStop').classList.remove('hidden'); $('taxiDone').classList.add('hidden');
+      setGps('actif — continue en arrière-plan','live');
+      if(pollTimer) clearInterval(pollTimer);
+      pollTimer=setInterval(nativePoll,1000); nativePoll();
+      return true;
+    }
+    return false;
+  }
+
+  function start(){ if(NATIVE) startNative(); else startWeb(); }
+  function stop(){ if(NATIVE) stopNative(); else stopWeb(); }
+  function onShow(){
+    if(!$('taxiDone').classList.contains('hidden')) return;  /* panneau "terminé" affiché : ne rien toucher */
+    if(resumeNative()) return;
+    if(!running) reset();
+  }
+
   return {
-    start, stop, reset, addToCarnet, renderAdd,
+    start, stop, reset, addToCarnet, renderAdd, onShow,
     isRunning:()=>running,
     setAddSrc:(s)=>{ addSrc=s; renderAdd(); },
     setAddPay:(p)=>{ addPay=p; renderAdd(); }

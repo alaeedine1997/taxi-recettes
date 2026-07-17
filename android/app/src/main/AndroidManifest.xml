@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -30,42 +30,11 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".CopiloteActivity"
-            android:exported="false"
-            android:label="@string/copilote_title"
-            android:parentActivityName=".MainActivity" />
-
-        <activity
-            android:name=".LogActivity"
-            android:exported="false"
-            android:label="@string/log_title"
-            android:parentActivityName=".CopiloteActivity" />
-
-        <!-- Le "mouchard" : lecture seule de l'ecran -->
+        <!-- Taximètre natif : GPS en arrière-plan + bulle flottante -->
         <service
-            android:name=".CopiloteAccessibilityService"
-            android:exported="true"
-            android:label="@string/accessibility_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <!-- Lecteur de notifications (canal de secours) -->
-        <service
-            android:name=".CopiloteNotificationService"
-            android:exported="true"
-            android:label="@string/notif_label"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+            android:name=".TaximeterService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -76,16 +45,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <!-- Service de premier plan : garde le Copilote en vie (anti-MIUI) -->
-        <service
-            android:name=".KeepAliveService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Observation en lecture seule des ecrans de course pour enregistrer automatiquement les recettes du chauffeur." />
-        </service>
 
     </application>
 </manifest>
