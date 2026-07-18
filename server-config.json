@@ -1,0 +1,7 @@
+{
+  "commentaire": "Config du serveur de la plateforme (E1.1). La cle 'publishable' est publique par conception (embarquee dans l'app).",
+  "supabaseUrl": "https://trftmfsuucgauglchnfw.supabase.co",
+  "supabaseAnonKey": "sb_publishable_mjNmfNZfe-h6Ywj_Gr3g3Q_MZBstjrh",
+  "authEmailDomain": "taxi.local",
+  "roles": ["superadmin", "patron", "chauffeur"]
+}
