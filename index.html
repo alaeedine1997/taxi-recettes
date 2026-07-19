@@ -669,8 +669,9 @@ function loadDb(){
   }catch(e){ return freshDb(); }
 }
 let db = loadDb();
+let carnetSyncHook = null;   /* branché par le module de synchro quand on est connecté */
 function saveDb(){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); return true; }
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); if(carnetSyncHook) carnetSyncHook(); return true; }
   catch(e){ toast('Erreur de sauvegarde — mémoire pleine ?'); return false; }
 }
 
@@ -1966,8 +1967,117 @@ const auth = (function(){
   }
   function logout(){ clear(); renderAccount(); }
   load();
-  return {isLogged, role, username, login, logout, ensureFresh};
+  return {isLogged, role, username, login, logout, ensureFresh,
+    token:()=>session&&session.access_token, userId:()=>session&&session.user&&session.user.id};
 })();
+
+/* ===================== SYNC DU CARNET (hors-ligne d'abord) ===================== */
+const SYNC_META = 'taxiSyncV1';
+const carnet = (function(){
+  let pushTimer=null, pushing=false;
+  function meta(){ try{ return JSON.parse(localStorage.getItem(SYNC_META)||'{}'); }catch(_){ return {}; } }
+  function setMeta(m){ try{ localStorage.setItem(SYNC_META, JSON.stringify(m)); }catch(_){ } }
+  function writeLocal(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }catch(_){ } }
+  function backup(who){ try{ localStorage.setItem(STORE_KEY+'_backup_'+(who||'x'), JSON.stringify(db)); }catch(_){ } }
+  async function sbAuthed(path, opts){
+    if(!(await auth.ensureFresh())) return {ok:false, netError:true};
+    opts=opts||{};
+    const headers=Object.assign({'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+auth.token()}, opts.headers||{});
+    try{
+      const r=await fetch(SB_URL+path,{method:opts.method||'GET',headers,body:opts.body});
+      let data=null; try{ data=await r.json(); }catch(_){ }
+      return {ok:r.ok, status:r.status, data};
+    }catch(_){ return {ok:false, netError:true}; }
+  }
+  /* PUSH avec GARDE-FOU anti-écrasement : insère si absent, puis ne met à jour QUE si le serveur est plus ancien */
+  async function push(){
+    if(!auth.isLogged() || pushing) return false;
+    pushing=true;
+    const m=meta(), ts=m.localUpdatedAt||Date.now(), tsISO=new Date(ts).toISOString(), uid=auth.userId();
+    const rowData={ data:db, updated_at:tsISO, device:(navigator.userAgent||'').slice(0,60) };
+    await sbAuthed('/rest/v1/carnets?on_conflict=user_id', {method:'POST', headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'}, body:JSON.stringify([Object.assign({user_id:uid}, rowData)])});
+    const r=await sbAuthed('/rest/v1/carnets?user_id=eq.'+uid+'&updated_at=lt.'+encodeURIComponent(tsISO), {method:'PATCH', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(rowData)});
+    pushing=false;
+    if(r.ok){ const mm=meta(); mm.lastSyncedAt=ts; setMeta(mm); return true; }
+    return false;
+  }
+  function schedulePush(){
+    const m=meta(); m.localUpdatedAt=Date.now(); setMeta(m);   /* toujours horodater, même en solo (protège les données solo) */
+    if(!auth.isLogged()) return;
+    if(pushTimer) clearTimeout(pushTimer);
+    pushTimer=setTimeout(push, 1500);
+  }
+  async function fetchServer(){
+    const r=await sbAuthed('/rest/v1/carnets?select=data,updated_at&limit=1');
+    if(!r.ok) return {net:false};
+    return {net:true, row: Array.isArray(r.data)&&r.data.length ? r.data[0] : null};
+  }
+  function adopt(data, serverT){
+    db=normalizeDb(data); writeLocal();
+    const m=meta(); m.localUpdatedAt=serverT; m.lastSyncedAt=serverT; setMeta(m);
+    renderAll();
+  }
+  /* PULL (même utilisateur) : réconcilie local ↔ serveur par le plus récent */
+  async function pull(){
+    if(!auth.isLogged()) return;
+    const s=await fetchServer(); if(!s.net) return;   /* hors-ligne : on garde le local */
+    const m=meta();
+    if(m.unverified){   /* identité venue d'un login hors-ligne : le carnet du compte n'a jamais été comparé */
+      if(s.row && s.row.data){   /* le compte a un carnet serveur → priorité au compte (comme en ligne), local sauvegardé */
+        backup(m.ownerId||'unv');
+        adopt(s.row.data, Date.parse(s.row.updated_at)||Date.now());
+        const mm=meta(); delete mm.unverified; setMeta(mm); toast('Carnet du compte récupéré');
+      } else {   /* compte vide → le carnet local (solo) devient celui du compte */
+        const mm=meta(); delete mm.unverified; mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm); push();
+      }
+      return;
+    }
+    const localT=m.localUpdatedAt||0;
+    if(s.row && s.row.data){
+      const serverT=Date.parse(s.row.updated_at)||0;
+      if(serverT>localT){ adopt(s.row.data, serverT); toast('Carnet synchronisé'); }
+      else if(localT>(m.lastSyncedAt||0)){ push(); }
+    } else if(localT>0 || Object.keys(db.days||{}).length){
+      const mm=meta(); mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm); push();
+    }
+  }
+  /* CLAIM : appelé à la connexion. Gère le changement d'identité sur un appareil partagé, sans JAMAIS perdre de données.
+     Règle d'or : on interroge le serveur AVANT de toucher au carnet local. Hors-ligne, on ne détruit rien. */
+  async function claim(userId){
+    const m=meta();
+    if((m.ownerId||null)===userId){ await pull(); return; }
+    const wasSolo=!m.ownerId;
+    const soloDb = wasSolo ? JSON.parse(JSON.stringify(db)) : null;   /* copie du solo : jours ET réglages */
+    const soloHadDays = wasSolo && Object.keys(db.days||{}).length>0;
+    const soloT = m.localUpdatedAt||0;
+    backup(m.ownerId||'solo');                              /* filet de secours */
+    const s=await fetchServer();                            /* ← lecture serveur AVANT tout reset local */
+    if(!s.net){                                             /* HORS-LIGNE : on ne peut pas réconcilier → on ne perd rien */
+      if(wasSolo){ setMeta({ownerId:userId, localUpdatedAt:soloT, lastSyncedAt:0, unverified:true}); } /* garder le solo, réconciliation vérifiée au retour réseau */
+      else { db=freshDb(); writeLocal(); setMeta({ownerId:userId}); }                 /* données d'un AUTRE compte → vierge (sauvegardées + sur le serveur) */
+      renderAll(); return;
+    }
+    setMeta({ownerId:userId});
+    if(s.row && s.row.data){                                /* le compte a déjà un carnet → on l'adopte */
+      adopt(s.row.data, Date.parse(s.row.updated_at)||Date.now());
+      if(soloHadDays) toast('Données locales mises de côté (compte prioritaire)');
+    } else {                                                /* serveur vide → on rattache le solo (ou carnet vierge) */
+      db=normalizeDb(soloDb||freshDb()); writeLocal();
+      const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+      renderAll(); push();
+      if(soloHadDays) toast('Tes données ont été rattachées à ton compte');
+    }
+  }
+  /* RELEASE : à la déconnexion. Revient à un carnet solo vierge (les données du compte sont sur le serveur + sauvegardées). */
+  function release(){
+    backup(meta().ownerId||'me');                          /* sauvegarde inconditionnelle avant de vider */
+    db=freshDb(); writeLocal(); setMeta({ownerId:null});
+    renderAll();
+  }
+  return { schedulePush, pull, claim, release };
+})();
+carnetSyncHook = carnet.schedulePush;
+window.addEventListener('online', ()=>{ if(auth.isLogged()) carnet.pull(); });
 
 function roleLabel(r){ return r==='superadmin'?'Super Admin':(r==='patron'?'Patron de flotte':(r==='chauffeur'?'Chauffeur':'—')); }
 function showAuth(on){ $('authScreen').classList.toggle('show', on!==false); if(on!==false) setTimeout(()=>$('authUser').focus(),60); }
@@ -1989,7 +2099,7 @@ function renderAccount(){
 }
 $('accountBody').addEventListener('click', e=>{
   if(e.target.closest('#accLogin')){ authError(''); $('authUser').value=''; $('authPass').value=''; showAuth(true); }
-  if(e.target.closest('#accLogout')){ if(confirm('Se déconnecter de ton compte ?')){ auth.logout(); toast('Déconnecté'); } }
+  if(e.target.closest('#accLogout')){ if(confirm('Se déconnecter de ton compte ?')){ auth.logout(); carnet.release(); toast('Déconnecté'); } }
 });
 $('authCancel').addEventListener('click', hideAuth);
 $('authEye').addEventListener('click', ()=>{
@@ -2005,11 +2115,11 @@ $('authForm').addEventListener('submit', async e=>{
   let res; try{ res = await auth.login($('authUser').value, $('authPass').value); }
   catch(_){ res={ok:false, msg:'Une erreur est survenue.'}; }
   btn.disabled=false; btn.classList.remove('loading'); txt.textContent='Se connecter';
-  if(res.ok){ hideAuth(); $('authPass').value=''; renderAccount(); toast('Connecté — '+roleLabel(auth.role())); }
+  if(res.ok){ hideAuth(); $('authPass').value=''; renderAccount(); toast('Connecté — '+roleLabel(auth.role())); carnet.claim(auth.userId()); }
   else authError(res.msg||'Connexion impossible.');
 });
 renderAccount();
-if(auth.isLogged()) auth.ensureFresh().then(renderAccount);   /* si le refresh échoue (compte révoqué), l'UI se remet à jour */
+if(auth.isLogged()) auth.ensureFresh().then(function(){ renderAccount(); if(auth.isLogged()) carnet.claim(auth.userId()); });   /* refresh + resync au démarrage */
 
 /* ============================== INIT ============================== */
 if(db.activeDay && db.days[db.activeDay]) state.date = db.activeDay;
