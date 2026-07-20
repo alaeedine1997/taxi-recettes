@@ -2094,7 +2094,9 @@ const carnet = (function(){
      Renvoie true UNIQUEMENT si nos données ont réellement atteint le serveur.
      0 ligne modifiée = le serveur est plus récent → on ne ment pas (pas de lastSyncedAt), on réconcilie sans perte. */
   async function doPush(){
-    const m=meta(), ts=m.localUpdatedAt||Date.now(), tsISO=new Date(ts).toISOString(), uid=auth.userId();
+    const m=meta();
+    if((m.localUpdatedAt||0) <= (m.lastSyncedAt||0)) return true;   /* rien de neuf à pousser → éviter POST/PATCH/stale/fetch inutiles (invariant monotone) */
+    const ts=m.localUpdatedAt||Date.now(), tsISO=new Date(ts).toISOString(), uid=auth.userId();
     const rowData={ data:db, updated_at:tsISO, device:(navigator.userAgent||'').slice(0,60) };
     const ins=await sbAuthed('/rest/v1/carnets?on_conflict=user_id', {method:'POST', headers:{'Prefer':'resolution=ignore-duplicates,return=representation'}, body:JSON.stringify([Object.assign({user_id:uid}, rowData)])});
     if(!ins.ok) return false;                                    /* réseau/serveur KO */
@@ -2117,9 +2119,10 @@ const carnet = (function(){
         const s=await fetchServer();
         if(!s.net){ res=false; }                                 /* serveur illisible → NE PAS re-pousser (sinon on écrase des données plus récentes) ; on réessaiera */
         else {
-          if(s.row && s.row.data){ mergeDaysInto(db, normalizeDb(s.row.data)); db=normalizeDb(db); writeLocal(); }
           const serverT=(s.row && Date.parse(s.row.updated_at))||0;
-          const mm=meta(); mm.localUpdatedAt=Math.max(Date.now(), serverT+1); setMeta(mm);   /* borne au-dessus de l'horodatage serveur (dérive d'horloge d'un autre appareil) */
+          /* serveur plus récent = BASE (ses scalaires km/horaires l'emportent, cohérent avec pull/claim) ; on ré-injecte les courses locales par union d'id */
+          if(s.row && s.row.data){ const localCopy=JSON.parse(JSON.stringify(db)); db=normalizeDb(s.row.data); mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal(); }
+          bumpLocal(serverT+1);                                  /* horodatage monotone, borné au-dessus du serveur */
           res=await doPush();                                    /* notre horodatage > serveur → le PATCH écrit la fusion */
           renderAll();
         }
@@ -2128,8 +2131,15 @@ const carnet = (function(){
     })();
     try{ return await pushInflight; } finally{ pushing=false; pushInflight=null; }
   }
+  /* Horodatage MONOTONE : localUpdatedAt dépasse toujours strictement lastSyncedAt (invariant "non-synchro")
+     ET l'horodatage serveur — même après une dérive/recul d'horloge. C'est la clé de voûte de toute la réconciliation. */
+  function bumpLocal(extraFloor){
+    const m=meta();
+    m.localUpdatedAt=Math.max(Date.now(), (m.localUpdatedAt||0)+1, (m.lastSyncedAt||0)+1, (extraFloor||0));
+    setMeta(m); return m.localUpdatedAt;
+  }
   function schedulePush(){
-    const m=meta(); m.localUpdatedAt=Date.now(); setMeta(m);   /* toujours horodater, même en solo (protège les données solo) */
+    bumpLocal();   /* toujours horodater (monotone), même en solo (protège les données solo) */
     if(!auth.isLogged()) return;
     if(pushTimer) clearTimeout(pushTimer);
     pushTimer=setTimeout(push, 1500);
@@ -2157,7 +2167,7 @@ const carnet = (function(){
         adopt(s.row.data, Date.parse(s.row.updated_at)||Date.now());
         if(hadLocalDays){
           mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal();
-          const mm=meta(); mm.localUpdatedAt=Date.now(); delete mm.unverified; setMeta(mm);
+          const mm=meta(); delete mm.unverified; setMeta(mm); bumpLocal();
           renderAll(); const okp=await push();
           if(okp){ dropBackup('unv'); dropBackup(m.ownerId); }
           toast('Carnet fusionné (compte + saisie hors-ligne)');
@@ -2165,7 +2175,7 @@ const carnet = (function(){
           const mm=meta(); delete mm.unverified; setMeta(mm); dropBackup('unv'); dropBackup(m.ownerId); toast('Carnet du compte récupéré');
         }
       } else {   /* compte vide → le carnet local (solo) devient celui du compte */
-        const mm=meta(); delete mm.unverified; mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm);
+        const mm=meta(); delete mm.unverified; setMeta(mm); bumpLocal();
         const okp=await push(); if(okp){ dropBackup('unv'); dropBackup(m.ownerId); }
       }
       return;
@@ -2179,7 +2189,7 @@ const carnet = (function(){
           const localCopy=JSON.parse(JSON.stringify(db));
           adopt(s.row.data, serverT);
           mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal();
-          const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+          bumpLocal();
           renderAll(); const okp=await push(); if(okp) dropBackup(m.ownerId||'me');
           toast('Carnet fusionné (serveur + saisie hors-ligne)');
         } else {
@@ -2188,7 +2198,7 @@ const carnet = (function(){
       }
       else if(localT>(m.lastSyncedAt||0)){ push(); }
     } else if(localT>0 || Object.keys(db.days||{}).length){
-      const mm=meta(); mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm); push();
+      bumpLocal(); push();
     }
   }
   /* CLAIM : appelé à la connexion. Gère le changement d'identité sur un appareil partagé, sans JAMAIS perdre de données.
@@ -2217,7 +2227,7 @@ const carnet = (function(){
       if(acctBackup){ mergeDaysInto(db, acctBackup); recovered=true; }
       if(recovered){
         db=normalizeDb(db); writeLocal();
-        const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+        bumpLocal();
         renderAll(); const okp=await push();
         if(okp){ dropBackup('solo'); dropBackup(userId); }
         if(soloHadDays) toast('Tes courses invité ont été fusionnées à ton compte');
@@ -2228,7 +2238,7 @@ const carnet = (function(){
       db=normalizeDb(soloDb||freshDb());
       if(acctBackup) mergeDaysInto(db, acctBackup);
       db=normalizeDb(db); writeLocal();
-      const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+      bumpLocal();
       renderAll(); const okp=await push();
       if(okp){ dropBackup('solo'); dropBackup(userId); }
       if(soloHadDays) toast('Tes données ont été rattachées à ton compte');
