@@ -766,6 +766,9 @@ function dayIsEmpty(d){
   return (!d.rides || !d.rides.length) && (!d.charges || !d.charges.length)
     && d.kmStart==null && d.kmEnd==null && d.openedAt==null;
 }
+/* Journée RÉELLEMENT travaillée (ouverte/clôturée, ou avec courses/charges) — un km de départ saisi seul ne compte pas.
+   Sert à l'historique/mois/PDF pour ne pas gonfler « Jours travaillés » avec des journées jamais ouvertes. */
+function dayIsWorked(d){ return !!(d && (d.openedAt || d.closedAt || (d.rides&&d.rides.length) || (d.charges&&d.charges.length))); }
 function pruneEmptyDays(){
   for(const k of Object.keys(db.days)){
     if(k===db.activeDay) continue;
@@ -844,7 +847,7 @@ function computeDay(d){
   const perKm = (km && km>0) ? net/km : null;
   return {brut, net, charges, fuel, km, kmWarn, perKm, count:d.rides.length};
 }
-function monthDays(mk){ return Object.keys(db.days).filter(k=>k.startsWith(mk+'-')).sort(); }
+function monthDays(mk){ return Object.keys(db.days).filter(k=>k.startsWith(mk+'-') && dayIsWorked(db.days[k])).sort(); }
 function computeMonth(mk){
   const keys = monthDays(mk);
   let brut=0, net=0, charges=0, fuel=0, km=0, count=0;
@@ -963,6 +966,7 @@ function renderDay(){
   show('cardSummary', st!=='new');
   show('addRideForm', st==='open');
   show('addChargeForm', st==='open');
+  show('quickWrap', st==='open');   /* la saisie rapide (totaux du jour) n'est dispo qu'en journée ouverte */
 
   const c = computeDay(d);
   $('kmRes').innerHTML = c.kmWarn
@@ -1262,6 +1266,7 @@ $('quickToggle').addEventListener('click', ()=>{
   $('quickToggle').setAttribute('aria-expanded', String(!open));
 });
 $('quickAdd').addEventListener('click', ()=>{
+  if(dayState()!=='open'){ toast('Rouvre la journée pour ajouter des totaux'); return; }   /* garde-fou : pas de saisie sur une journée clôturée */
   const d = getDay(state.date);
   /* pré-contrôle : cash rempli mais « Sur l'app » vide sur une source app+cash */
   const bad = [];
@@ -1809,7 +1814,7 @@ function makeMonthPdf(mk){
 }
 $('pdfBtn').addEventListener('click', ()=>{
   const day = peekDay(state.date);
-  if(dayIsEmpty(day)){ toast('Rien à exporter pour cette journée'); return; }
+  if(!dayIsWorked(day)){ toast('Rien à exporter pour cette journée'); return; }
   download('rapport-taxi-'+state.date+'.pdf', makePdf(state.date, day))
     .then(ok=>{ if(ok) toast('PDF prêt'); });
 });
@@ -1913,6 +1918,10 @@ const taxi = (function(){
   function addToCarnet(){
     const price=lastFinal;
     const d=getDay(state.date);
+    if(!d.openedAt && !d.closedAt){                                   /* journée jamais ouverte → l'ouvrir en ajoutant la course (sinon elle paraîtrait « Clôturée ») */
+      d.openedAt = state.date===todayKey()?nowHM():'';
+      if(!db.activeDay) db.activeDay = state.date;
+    }
     d.rides.push({id:'r'+Date.now()+Math.floor(Math.random()*1000), t: state.date===todayKey()?nowHM():'', src:addSrc, srcName:sourceName(addSrc), pay:addPay, amt:price, rate: addPay==='app'?0:rateOf(addSrc)});
     const ok=saveDb(); renderDay();
     if(ok) toast('Course ajoutée — '+fmtEur(price));
