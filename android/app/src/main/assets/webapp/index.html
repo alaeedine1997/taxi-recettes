@@ -359,6 +359,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 
 <!-- ===================== TAXIMÈTRE ===================== -->
 <section class="view" id="view-taxi">
+  <div class="card platebar" id="plateBar" style="display:none"></div>
   <div class="card taxicard">
     <div class="taxi-meter">
       <div class="tm-head">
@@ -506,6 +507,28 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   nav.tabs button.lockedtab{opacity:.5}
   .muted{color:var(--text2)}
   body.guest #pdfBtn{display:none!important}
+  /* ---- Prise de plaque ---- */
+  .platebar{display:flex;align-items:center;gap:12px;padding:13px 15px}
+  .platebar.need{border:1.5px solid #E7B24a;background:linear-gradient(0deg,rgba(214,158,74,.10),rgba(214,158,74,.10))}
+  .platebar .pb-ico{width:38px;height:38px;border-radius:11px;background:#B14A28;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:18px}
+  .platebar.need .pb-ico{background:#C68A1E}
+  .platebar .pb-txt{flex:1;min-width:0}
+  .platebar .pb-l1{font-weight:600;font-size:15px}
+  .platebar .pb-l2{font-size:12.5px;color:var(--text2);margin-top:1px}
+  .platebar .pb-btn{flex:0 0 auto;border:1.5px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:9px 13px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;min-height:40px}
+  .platebar.need .pb-btn{background:#B14A28;border-color:#B14A28;color:#fff}
+  #platePicker{position:fixed;inset:0;z-index:2100;display:none;flex-direction:column;align-items:center;justify-content:center;padding:26px 20px;background:rgba(20,15,9,.55)}
+  #platePicker.show{display:flex}
+  #platePicker .pp-wrap{width:100%;max-width:380px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px 20px;box-shadow:0 20px 50px -18px rgba(0,0,0,.5)}
+  #platePicker .pp-title{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:23px;margin:0 0 4px}
+  #platePicker .pp-sub{color:var(--text2);font-size:14px;margin:0 0 14px;line-height:1.45}
+  #platePicker .pp-list{display:flex;flex-direction:column;gap:9px;max-height:52vh;overflow:auto}
+  #platePicker .pp-item{display:flex;align-items:center;gap:11px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:12px;padding:14px 15px;font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;min-height:52px}
+  #platePicker .pp-item:hover{border-color:#B14A28}
+  #platePicker .pp-item .tag{width:30px;height:30px;border-radius:8px;background:#B14A28;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto}
+  #platePicker .pp-empty{color:var(--text2);font-size:14px;text-align:center;padding:18px 0}
+  #platePicker .pp-err{color:#C0392B;font-size:13.5px;margin-top:10px;min-height:1px}
+  #platePicker .pp-cancel{margin-top:14px;width:100%;min-height:46px;border:1.5px solid var(--border);background:transparent;color:var(--text2);border-radius:11px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer}
   #welcomeScreen .note{font-size:13px;color:#7C6F5B;margin-top:4px;line-height:1.45}
   @media (prefers-color-scheme:dark){
     #welcomeScreen .m{background:#D2622F}
@@ -607,6 +630,16 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       </button>
     </form>
     <button type="button" class="auth-ghost" id="authCancel">Continuer en tant qu'invité</button>
+  </div>
+</div>
+
+<div id="platePicker" role="dialog" aria-modal="true" aria-label="Choisir une plaque">
+  <div class="pp-wrap">
+    <h2 class="pp-title">Prends ta plaque</h2>
+    <p class="pp-sub">Choisis la plaque que tu conduis maintenant pour pouvoir démarrer.</p>
+    <div class="pp-list" id="ppList"></div>
+    <div class="pp-err" id="ppErr" role="alert"></div>
+    <button type="button" class="pp-cancel" id="ppCancel">Annuler</button>
   </div>
 </div>
 
@@ -1166,7 +1199,7 @@ function renderAll(){ renderTabs(); renderDay(); renderHistory(); renderSettings
 
 /* ============================== ÉVÉNEMENTS ============================== */
 document.querySelectorAll('nav.tabs button').forEach(b=>{
-  b.addEventListener('click', ()=>{ state.tab = b.dataset.tab; renderTabs(); if(state.tab==='history') renderHistory(); if(state.tab==='taxi') renderTaxi(); window.scrollTo({top:0}); });
+  b.addEventListener('click', ()=>{ state.tab = b.dataset.tab; renderTabs(); if(state.tab==='history') renderHistory(); if(state.tab==='taxi'){ renderTaxi(); if(plates.required() && navigator.onLine) plates.refreshActive().then(renderPlate); } window.scrollTo({top:0}); });
 });
 $('dateInput').addEventListener('change', e=>{
   const v = e.target.value;
@@ -1971,9 +2004,16 @@ const taxi = (function(){
     return false;
   }
 
-  function start(){ if(NATIVE) startNative(); else startWeb(); }
+  async function start(){
+    if(plates.required()){                                             /* flotte : compteur bloqué sans plaque active */
+      if(navigator.onLine){ await plates.refreshActive(); renderPlate(); }   /* revalide côté serveur (cache pouvait être périmé : plaque rendue ailleurs) */
+      if(!plates.active()){ toast('Prends ta plaque d\'abord'); openPlatePicker(); return; }
+    }
+    if(NATIVE) startNative(); else startWeb();
+  }
   function stop(){ if(NATIVE) stopNative(); else stopWeb(); }
   function onShow(){
+    renderPlate();                                           /* bandeau plaque (DOM seul, pas de réseau ici) */
     if(!$('taxiDone').classList.contains('hidden')) return;  /* panneau "terminé" affiché : ne rien toucher */
     if(resumeNative()) return;
     if(!running) reset();
@@ -2021,7 +2061,7 @@ const auth = (function(){
   }
   async function fetchProfile(token, uid){
     const filt = uid ? '&id=eq.'+encodeURIComponent(uid) : '';   /* défense en profondeur : on ne dépend pas que de la RLS */
-    const r = await api('/rest/v1/profiles?select=username,role,display_name'+filt, {headers:{'Authorization':'Bearer '+token}});
+    const r = await api('/rest/v1/profiles?select=username,role,display_name,fleet_id'+filt, {headers:{'Authorization':'Bearer '+token}});
     if(r.netError) return {netError:true};
     return {prof: (r.ok && Array.isArray(r.data) && r.data.length) ? r.data[0] : null};
   }
@@ -2070,6 +2110,8 @@ const auth = (function(){
   function logout(){ clear(); renderAccount(); }
   load();
   return {isLogged, role, username, login, logout, ensureFresh, setOnInvalid,
+    fleetId:()=>session&&session.profile&&session.profile.fleet_id||null,
+    displayName:()=>session&&session.profile&&(session.profile.display_name||session.profile.username)||null,
     token:()=>session&&session.access_token, userId:()=>session&&session.user&&session.user.id};
 })();
 
@@ -2270,7 +2312,118 @@ const carnet = (function(){
   return { schedulePush, pull, claim, release, flush };
 })();
 carnetSyncHook = carnet.schedulePush;
-window.addEventListener('online', ()=>{ if(auth.isLogged()) carnet.pull(); });
+window.addEventListener('online', ()=>{ if(auth.isLogged()){ carnet.pull(); if(plates.required()) plates.refreshActive().then(renderPlate); } });
+
+/* ===================== PRISE DE PLAQUE (Étape 2 — flotte) ===================== */
+const PLATE_KEY = 'taxiPlateV1';
+const plates = (function(){
+  let cache = null;
+  try{ cache = JSON.parse(localStorage.getItem(PLATE_KEY)||'null'); }catch(_){ cache=null; }
+  function save(){ try{ if(cache) localStorage.setItem(PLATE_KEY, JSON.stringify(cache)); else localStorage.removeItem(PLATE_KEY); }catch(_){ } }
+  function active(){ return cache; }
+  /* Seul un chauffeur RATTACHÉ À UNE FLOTTE doit prendre une plaque (solo/invité/patron = non concernés). */
+  function required(){ return auth.isLogged() && auth.role()==='chauffeur' && !!auth.fleetId(); }
+  async function sb(path, opts){
+    if(!(await auth.ensureFresh())) return {ok:false, netError:true};
+    opts=opts||{};
+    const headers=Object.assign({'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+auth.token()}, opts.headers||{});
+    try{ const r=await fetch(SB_URL+path,{method:opts.method||'GET',headers,body:opts.body}); let data=null; try{ data=await r.json(); }catch(_){ }
+      return {ok:r.ok, status:r.status, data}; }catch(_){ return {ok:false, netError:true}; }
+  }
+  async function listPlates(){
+    const fid=auth.fleetId(); if(!fid) return {ok:false};
+    const r=await sb('/rest/v1/plates?select=id,label&fleet_id=eq.'+encodeURIComponent(fid)+'&active=eq.true&order=label.asc');
+    if(r.netError) return {ok:false, net:true};
+    return {ok:r.ok, list:(r.ok&&Array.isArray(r.data))?r.data:[]};
+  }
+  async function refreshActive(){
+    const uid=auth.userId();
+    if(!uid || !required()){ if(cache){ cache=null; save(); } return; }
+    const r=await sb('/rest/v1/plate_sessions?select=id,plate_id,started_at,plates(label)&driver_id=eq.'+encodeURIComponent(uid)+'&ended_at=is.null&order=started_at.desc&limit=1');
+    if(r.netError) return;                               /* hors-ligne : on garde le cache local */
+    if(r.ok && Array.isArray(r.data) && r.data.length){
+      const s=r.data[0];
+      cache={sessionId:s.id, plateId:s.plate_id, label:(s.plates&&s.plates.label)||'?', startedAt:s.started_at};
+    } else if(r.ok){ cache=null; }
+    save();
+  }
+  async function take(plateId, label){
+    const fid=auth.fleetId(), uid=auth.userId();
+    if(!fid||!uid) return {ok:false};
+    const r=await sb('/rest/v1/plate_sessions', {method:'POST', headers:{'Prefer':'return=representation'}, body:JSON.stringify([{plate_id:plateId, driver_id:uid, fleet_id:fid}])});
+    if(r.ok && Array.isArray(r.data) && r.data.length){ cache={sessionId:r.data[0].id, plateId, label, startedAt:r.data[0].started_at}; save(); return {ok:true}; }
+    if(r.status===409){                                   /* violation d'index unique partiel : distinguer les 2 cas */
+      const m=((r.data&&(r.data.message||r.data.details))||'')+'';
+      if(m.indexOf('one_active_driver')>=0) return {ok:false, mine:true};   /* JE détiens déjà une plaque */
+      return {ok:false, taken:true};                                        /* la plaque est déjà prise par un autre */
+    }
+    if(r.netError) return {ok:false, net:true};
+    return {ok:false};
+  }
+  async function release(){
+    if(!cache) return {ok:true};
+    const r=await sb('/rest/v1/plate_sessions?id=eq.'+encodeURIComponent(cache.sessionId), {method:'PATCH', headers:{'Prefer':'return=minimal'}, body:JSON.stringify({ended_at:new Date().toISOString()})});
+    if(r.ok){ cache=null; save(); return {ok:true}; }
+    if(r.netError) return {ok:false, net:true};
+    return {ok:false};
+  }
+  function clearLocal(){ cache=null; save(); }
+  return { active, required, listPlates, refreshActive, take, release, clearLocal };
+})();
+
+function fmtHM(iso){ try{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(_){ return ''; } }
+function renderPlate(){
+  const bar=$('plateBar'); if(!bar) return;
+  if(!plates.required()){ bar.style.display='none'; bar.classList.remove('need'); return; }
+  bar.style.display='flex';
+  const a=plates.active();
+  if(a){
+    bar.classList.remove('need');
+    bar.innerHTML='<div class="pb-ico" aria-hidden="true">🚕</div>'+
+      '<div class="pb-txt"><div class="pb-l1">Plaque '+esc(a.label)+'</div>'+
+      '<div class="pb-l2">En service'+(a.startedAt?' depuis '+fmtHM(a.startedAt):'')+'</div></div>'+
+      '<button type="button" class="pb-btn" id="plateRelease">Rendre</button>';
+  } else {
+    bar.classList.add('need');
+    bar.innerHTML='<div class="pb-ico" aria-hidden="true">⚠</div>'+
+      '<div class="pb-txt"><div class="pb-l1">Aucune plaque</div>'+
+      '<div class="pb-l2">Choisis ta plaque pour démarrer</div></div>'+
+      '<button type="button" class="pb-btn" id="plateTake">Prendre</button>';
+  }
+}
+async function openPlatePicker(){
+  const ov=$('platePicker'), list=$('ppList'), err=$('ppErr');
+  err.textContent=''; list.innerHTML='<div class="pp-empty">Chargement…</div>';
+  ov.classList.add('show');
+  if(navigator.onLine){ await plates.refreshActive(); if(plates.active()){ renderPlate(); closePlatePicker(); toast('Tu as déjà la plaque '+plates.active().label); return; } }   /* auto-guérison : cache restauré */
+  const res=await plates.listPlates();
+  if(!res.ok){ list.innerHTML='<div class="pp-empty">'+(res.net?'Pas de connexion — réessaie.':'Impossible de charger les plaques.')+'</div>'; return; }
+  if(!res.list.length){ list.innerHTML='<div class="pp-empty">Aucune plaque dans ta flotte. Demande à ton patron d\'en ajouter une.</div>'; return; }
+  list.innerHTML=res.list.map(p=>'<button type="button" class="pp-item" data-plate="'+esc(p.id)+'" data-label="'+esc(p.label)+'"><span class="tag" aria-hidden="true">🚕</span>'+esc(p.label)+'</button>').join('');
+}
+function closePlatePicker(){ $('platePicker').classList.remove('show'); }
+$('plateBar').addEventListener('click', e=>{
+  if(e.target.closest('#plateTake')) openPlatePicker();
+  if(e.target.closest('#plateRelease')){
+    if(confirm('Rendre ta plaque ? Tu devras en reprendre une pour démarrer une course.')){
+      (async()=>{ const r=await plates.release(); if(r.ok){ toast('Plaque rendue'); } else toast(r.net?'Hors-ligne — réessaie':'Erreur'); renderPlate(); })();
+    }
+  }
+});
+$('ppList').addEventListener('click', e=>{
+  const b=e.target.closest('[data-plate]'); if(!b) return;
+  const id=b.dataset.plate, label=b.dataset.label, err=$('ppErr');
+  err.textContent=''; b.disabled=true;
+  (async()=>{
+    const r=await plates.take(id, label); b.disabled=false;
+    if(r.ok){ closePlatePicker(); toast('Plaque '+label+' prise'); renderPlate(); }
+    else if(r.mine){ err.textContent='Tu détiens déjà une plaque — rends-la avant d\'en prendre une autre.'; plates.refreshActive().then(()=>{ renderPlate(); closePlatePicker(); }); }
+    else if(r.taken) err.textContent='Cette plaque est déjà prise par un autre chauffeur.';
+    else if(r.net) err.textContent='Pas de connexion — réessaie.';
+    else err.textContent='Cette plaque n\'est plus disponible.';
+  })();
+});
+$('ppCancel').addEventListener('click', closePlatePicker);
 
 function roleLabel(r){ return r==='superadmin'?'Super Admin':(r==='patron'?'Patron de flotte':(r==='chauffeur'?'Chauffeur':'—')); }
 function showAuth(on){ $('authScreen').classList.toggle('show', on!==false); if(on!==false) setTimeout(()=>$('authUser').focus(),60); }
@@ -2291,6 +2444,7 @@ let invalidTimer=null;
 function sessionEnded(msg){
   if(invalidTimer){ clearTimeout(invalidTimer); invalidTimer=null; }   /* annule un teardown différé en attente (évite un double message contradictoire) */
   carnet.release();
+  plates.clearLocal();                                                 /* oublie la plaque en cache à la déconnexion */
   try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ }
   renderAccount(); renderAll();
   if(msg) toast(msg);
@@ -2335,13 +2489,13 @@ $('authForm').addEventListener('submit', async e=>{
   let res; try{ res = await auth.login($('authUser').value, $('authPass').value); }
   catch(_){ res={ok:false, msg:'Une erreur est survenue.'}; }
   btn.disabled=false; btn.classList.remove('loading'); txt.textContent='Se connecter';
-  if(res.ok){ hideAuth(); hideWelcome(); $('authPass').value=''; renderAccount(); renderAll(); toast('Connecté — '+roleLabel(auth.role())); carnet.claim(auth.userId()); }
+  if(res.ok){ hideAuth(); hideWelcome(); $('authPass').value=''; renderAccount(); renderAll(); toast('Connecté — '+roleLabel(auth.role())); carnet.claim(auth.userId()); plates.refreshActive().then(renderPlate); }
   else authError(res.msg||'Connexion impossible.');
 });
 renderAccount();
 if(auth.isLogged()) auth.ensureFresh().then(function(){
   renderAccount();
-  if(auth.isLogged()){ renderAll(); carnet.claim(auth.userId()); }   /* refresh + resync au démarrage */
+  if(auth.isLogged()){ renderAll(); carnet.claim(auth.userId()); plates.refreshActive().then(renderPlate); }   /* refresh + resync au démarrage */
   else renderAll();                                                  /* session révoquée au refresh : re-verrouillage immédiat ; onInvalid finalise (release + toast) */
 });
 try{ if(!auth.isLogged() && localStorage.getItem(ENTRY_KEY)!=='guest') showWelcome(); }catch(_){ }   /* 1er lancement : écran d'accueil */

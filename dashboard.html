@@ -75,6 +75,8 @@
   .rolechip.superadmin{background:rgba(177,74,40,.14);color:var(--brand)}
   .rolechip.chauffeur{background:rgba(124,111,91,.16);color:var(--muted)}
   .empty{color:var(--muted);font-size:14px;padding:14px 4px}
+  .muted{color:var(--muted)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
   .note{font-size:13px;color:var(--muted);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:11px 13px}
   .err{color:var(--danger);font-size:13.5px;margin-top:8px;min-height:1px}
 
@@ -138,6 +140,19 @@
       <h2 id="fleetsTitle">Mes flottes</h2>
       <p class="hint" id="fleetsHint">Coche les options débloquées pour chaque flotte. Les changements se sauvent automatiquement.</p>
       <div id="fleetsList"><div class="empty">Chargement…</div></div>
+    </div>
+
+    <!-- Plaques -->
+    <div class="card" id="platesCard">
+      <h2>Plaques</h2>
+      <p class="hint" id="platesHint">Ajoute tes plaques (matricules) et vois qui conduit quoi en temps réel.</p>
+      <div class="row c3" id="newPlateRow">
+        <div><label for="npLabel">Nouvelle plaque</label><input type="text" id="npLabel" placeholder="ex : TX-AA-101" autocapitalize="characters"></div>
+        <div id="npFleetWrap" class="hidden"><label for="npFleet">Flotte</label><select id="npFleet"></select></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="npAdd" style="width:100%">Ajouter</button></div>
+      </div>
+      <div class="err" id="npErr"></div>
+      <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
     </div>
 
     <!-- Comptes -->
@@ -221,7 +236,7 @@ function showApp(){
     ? 'Coche les options débloquées pour chaque flotte. Les changements se sauvent automatiquement.'
     : 'Options réglées par l\'administrateur.';
   $('accountsCard').classList.toggle('hidden', false);
-  loadFleets(); loadAccounts();
+  loadFleets(); loadPlates(); loadAccounts();
 }
 
 /* ---- flottes ---- */
@@ -232,6 +247,7 @@ async function loadFleets(){
   const el=$('fleetsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
+  _fleetsCache=fleets; fillNpFleet();   /* alimente le sélecteur de flotte pour l'ajout de plaque (superadmin) */
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -285,6 +301,78 @@ async function loadAccounts(){
     rows.map(p=>'<tr><td>'+esc(p.username)+'</td><td><span class="rolechip '+esc(p.role)+'">'+roleLabel(p.role)+'</span></td></tr>').join('')+
     '</tbody></table>';
 }
+
+/* ---- plaques (Étape 2) ---- */
+function fmtHM(iso){ try{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(_){ return ''; } }
+let _fleetsCache=[];
+async function loadPlates(){
+  const isAdmin=session.profile.role==='superadmin';
+  const [pr, sr] = await Promise.all([
+    api('/rest/v1/plates?select=id,label,active,fleet_id,fleets(name)&order=label.asc'),
+    api('/rest/v1/plate_sessions?select=id,plate_id,started_at,profiles(username,display_name)&ended_at=is.null')
+  ]);
+  const el=$('platesList');
+  if(!pr.ok){ el.innerHTML='<div class="empty">Impossible de charger les plaques.'+(pr.status===404?' (Le schéma des plaques n\'est pas encore installé — lance le SQL de l\'Étape 2.)':'')+'</div>'; return; }
+  const list=pr.data||[];
+  const sess={}; (sr.ok&&Array.isArray(sr.data)?sr.data:[]).forEach(s=>{ sess[s.plate_id]=s; });
+  const active=list.filter(p=>p.active).length;
+  $('platesHint').textContent = 'Ajoute tes plaques (matricules) et vois qui conduit quoi en temps réel. '+active+' plaque'+(active>1?'s':'')+' active'+(active>1?'s':'')+'.';
+  if(!list.length){ el.innerHTML='<div class="empty">Aucune plaque. Ajoute-en une ci-dessus.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Plaque</th>'+(isAdmin?'<th>Flotte</th>':'')+'<th>Conducteur</th><th></th></tr></thead><tbody>'+
+    list.map(p=>{
+      const s=sess[p.id];
+      const driver = s
+        ? '<span class="dot"></span>'+esc((s.profiles&&(s.profiles.display_name||s.profiles.username))||'?')+' <span class="muted">depuis '+fmtHM(s.started_at)+'</span>'
+        : '<span class="muted">libre</span>';
+      return '<tr'+(p.active?'':' style="opacity:.5"')+'>'+
+        '<td><b>'+esc(p.label)+'</b>'+(p.active?'':' <span class="pill off">inactive</span>')+'</td>'+
+        (isAdmin?'<td class="muted">'+esc((p.fleets&&p.fleets.name)||'')+'</td>':'')+
+        '<td>'+driver+'</td>'+
+        '<td style="text-align:right;white-space:nowrap">'+
+          (s?'<button class="btn sm ghost" data-release="'+s.id+'" data-lbl="'+esc(p.label)+'">Libérer</button> ':'')+
+          '<button class="btn sm ghost" data-plate-act="'+(p.active?'off':'on')+'" data-id="'+p.id+'">'+(p.active?'Désactiver':'Réactiver')+'</button>'+
+        '</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
+}
+function fillNpFleet(){
+  const isAdmin=session.profile.role==='superadmin';
+  $('npFleetWrap').classList.toggle('hidden', !isAdmin);
+  if(isAdmin){
+    const sel=$('npFleet');
+    sel.innerHTML = _fleetsCache.length
+      ? _fleetsCache.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('')
+      : '<option value="">— crée d\'abord une flotte —</option>';
+  }
+}
+async function addPlate(){
+  const label=$('npLabel').value.trim().toUpperCase(); $('npErr').textContent='';
+  if(!label){ $('npErr').textContent='Entre un matricule.'; return; }
+  const isAdmin=session.profile.role==='superadmin';
+  const fleet_id = isAdmin ? $('npFleet').value : session.profile.fleet_id;
+  if(!fleet_id){ $('npErr').textContent = isAdmin?'Choisis une flotte (crée-en une d\'abord).':'Ton compte n\'est rattaché à aucune flotte.'; return; }
+  const r=await api('/rest/v1/plates',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify([{label, fleet_id}])});
+  if(!r.ok){ $('npErr').textContent = r.status===409?'Cette plaque existe déjà dans la flotte.':(r.status===401||r.status===403?'Non autorisé.':'Création impossible.'); return; }
+  $('npLabel').value=''; toast('Plaque « '+label+' » ajoutée'); loadPlates();
+}
+$('npAdd').addEventListener('click', addPlate);
+$('platesList').addEventListener('click', async e=>{
+  const rel=e.target.closest('[data-release]');
+  if(rel){
+    if(!confirm('Libérer la plaque '+rel.dataset.lbl+' ? Le chauffeur devra la reprendre pour redémarrer.')) return;
+    rel.disabled=true;
+    const r=await api('/rest/v1/plate_sessions?id=eq.'+rel.dataset.release,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({ended_at:new Date().toISOString()})});
+    rel.disabled=false;
+    if(r.ok){ toast('Plaque libérée'); loadPlates(); } else toast('Échec');
+    return;
+  }
+  const b=e.target.closest('[data-plate-act]'); if(!b) return;
+  const active = b.dataset.plateAct==='on';
+  b.disabled=true;
+  const r=await api('/rest/v1/plates?id=eq.'+b.dataset.id,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({active})});
+  b.disabled=false;
+  if(r.ok){ toast(active?'Plaque réactivée':'Plaque désactivée'); loadPlates(); } else toast('Échec');
+});
 
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{
