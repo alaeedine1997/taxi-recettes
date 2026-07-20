@@ -2073,8 +2073,14 @@ const carnet = (function(){
   function backup(who){ try{ localStorage.setItem(STORE_KEY+'_backup_'+(who||'x'), JSON.stringify(db)); }catch(_){ } }
   function readBackup(who){ try{ return JSON.parse(localStorage.getItem(STORE_KEY+'_backup_'+(who||'x'))||'null'); }catch(_){ return null; } }
   function dropBackup(who){ try{ localStorage.removeItem(STORE_KEY+'_backup_'+(who||'x')); }catch(_){ } }
-  /* FLUSH : pousse immédiatement toute écriture en attente (annule le debounce). Renvoie true si le serveur a bien reçu. */
-  async function flush(){ if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } return await push(); }
+  /* FLUSH : pousse immédiatement toute écriture en attente (annule le debounce). Renvoie true si le serveur a bien reçu NOS dernières données. */
+  async function flush(){
+    if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; }
+    let ok=await push();
+    const m=meta();
+    if((m.localUpdatedAt||0) > (m.lastSyncedAt||0)) ok=await push();   /* un push coalescé a pu figer un db antérieur → repousser les toutes dernières saisies */
+    return ok;
+  }
   async function sbAuthed(path, opts){
     if(!(await auth.ensureFresh())) return {ok:false, netError:true};
     opts=opts||{};
@@ -2108,12 +2114,16 @@ const carnet = (function(){
     pushing=true;
     pushInflight=(async ()=>{
       let res=await doPush();
-      if(res==='stale'){                                         /* réconcilier SANS perte : fusionner le serveur puis re-pousser */
+      if(res==='stale'){                                         /* le serveur est plus récent → réconcilier SANS perte AVANT de re-pousser */
         const s=await fetchServer();
-        if(s.net && s.row && s.row.data){ mergeDaysInto(db, normalizeDb(s.row.data)); db=normalizeDb(db); writeLocal(); }
-        const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
-        res=await doPush();                                      /* notre horodatage > serveur → le PATCH écrit la fusion */
-        renderAll();
+        if(!s.net){ res=false; }                                 /* serveur illisible → NE PAS re-pousser (sinon on écrase des données plus récentes) ; on réessaiera */
+        else {
+          if(s.row && s.row.data){ mergeDaysInto(db, normalizeDb(s.row.data)); db=normalizeDb(db); writeLocal(); }
+          const serverT=(s.row && Date.parse(s.row.updated_at))||0;
+          const mm=meta(); mm.localUpdatedAt=Math.max(Date.now(), serverT+1); setMeta(mm);   /* borne au-dessus de l'horodatage serveur (dérive d'horloge d'un autre appareil) */
+          res=await doPush();                                    /* notre horodatage > serveur → le PATCH écrit la fusion */
+          renderAll();
+        }
       }
       return res===true;
     })();
@@ -2164,7 +2174,19 @@ const carnet = (function(){
     const localT=m.localUpdatedAt||0;
     if(s.row && s.row.data){
       const serverT=Date.parse(s.row.updated_at)||0;
-      if(serverT>localT){ adopt(s.row.data, serverT); toast('Carnet synchronisé'); }
+      if(serverT>localT){
+        if(localT>(m.lastSyncedAt||0)){                       /* le local a des saisies jamais poussées → fusion sans perte au lieu d'écraser */
+          backup(m.ownerId||'me');
+          const localCopy=JSON.parse(JSON.stringify(db));
+          adopt(s.row.data, serverT);
+          mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal();
+          const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+          renderAll(); const okp=await push(); if(okp) dropBackup(m.ownerId||'me');
+          toast('Carnet fusionné (serveur + saisie hors-ligne)');
+        } else {
+          adopt(s.row.data, serverT); toast('Carnet synchronisé');
+        }
+      }
       else if(localT>(m.lastSyncedAt||0)){ push(); }
     } else if(localT>0 || Object.keys(db.days||{}).length){
       const mm=meta(); mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm); push();
@@ -2176,11 +2198,12 @@ const carnet = (function(){
     const m=meta();
     if((m.ownerId||null)===userId){ await pull(); return; }
     const wasSolo=!m.ownerId;
-    const soloDb = wasSolo ? JSON.parse(JSON.stringify(db)) : null;   /* copie du solo : jours ET réglages */
-    const soloHadDays = wasSolo && Object.keys(db.days||{}).length>0;
-    const soloT = m.localUpdatedAt||0;
     backup(m.ownerId||'solo');                              /* filet de secours */
     const s=await fetchServer();                            /* ← lecture serveur AVANT tout reset local */
+    /* Instantané du solo capturé APRÈS l'await : inclut une course éventuellement saisie pendant la requête réseau */
+    const soloDb = wasSolo ? JSON.parse(JSON.stringify(db)) : null;   /* copie du solo : jours ET réglages */
+    const soloHadDays = wasSolo && Object.keys((soloDb&&soloDb.days)||{}).length>0;
+    const soloT = meta().localUpdatedAt||0;
     if(!s.net){                                             /* HORS-LIGNE : on ne peut pas réconcilier → on ne perd rien */
       if(wasSolo){ setMeta({ownerId:userId, localUpdatedAt:soloT, lastSyncedAt:0, unverified:true}); } /* garder le solo, réconciliation vérifiée au retour réseau */
       else { db=freshDb(); writeLocal(); setMeta({ownerId:userId}); }                 /* données d'un AUTRE compte → vierge (sauvegardées + sur le serveur) */
