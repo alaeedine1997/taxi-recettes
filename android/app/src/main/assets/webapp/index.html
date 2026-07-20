@@ -2041,7 +2041,12 @@ const auth = (function(){
     if(!session||!session.refresh_token) return false;
     const r = await api('/auth/v1/token?grant_type=refresh_token', {method:'POST', body:JSON.stringify({refresh_token:session.refresh_token})});
     if(r.netError) return false;                 /* hors-ligne : on garde la session */
-    if(!r.ok){ clear(); if(onInvalid){ try{ onInvalid(); }catch(_){ } } return false; }   /* refresh invalide : vraie déconnexion → teardown */
+    if(!r.ok){
+      const code=r.data && (r.data.error_code||r.data.error||'');
+      const authFail=(r.status===400||r.status===401||r.status===403) && code!=='over_request_rate_limit';
+      if(authFail){ clear(); if(onInvalid){ try{ onInvalid(); }catch(_){ } } }   /* vrai échec d'auth → teardown */
+      return false;                                                                /* 429 / 5xx transitoires : garder la session, on réessaiera */
+    }
     session.access_token=r.data.access_token; session.refresh_token=r.data.refresh_token;
     session.expires_at=Date.now()+(r.data.expires_in||3600)*1000; save();
     return true;
@@ -2060,7 +2065,7 @@ const auth = (function(){
 /* ===================== SYNC DU CARNET (hors-ligne d'abord) ===================== */
 const SYNC_META = 'taxiSyncV1';
 const carnet = (function(){
-  let pushTimer=null, pushing=false;
+  let pushTimer=null, pushing=false, pushInflight=null;
   function meta(){ try{ return JSON.parse(localStorage.getItem(SYNC_META)||'{}'); }catch(_){ return {}; } }
   function setMeta(m){ try{ localStorage.setItem(SYNC_META, JSON.stringify(m)); }catch(_){ } }
   function writeLocal(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }catch(_){ } }
@@ -2079,17 +2084,39 @@ const carnet = (function(){
       return {ok:r.ok, status:r.status, data};
     }catch(_){ return {ok:false, netError:true}; }
   }
-  /* PUSH avec GARDE-FOU anti-écrasement : insère si absent, puis ne met à jour QUE si le serveur est plus ancien */
-  async function push(){
-    if(!auth.isLogged() || pushing) return false;
-    pushing=true;
+  /* PUSH honnête : insère si absent, sinon met à jour SEULEMENT si le serveur est plus ancien.
+     Renvoie true UNIQUEMENT si nos données ont réellement atteint le serveur.
+     0 ligne modifiée = le serveur est plus récent → on ne ment pas (pas de lastSyncedAt), on réconcilie sans perte. */
+  async function doPush(){
     const m=meta(), ts=m.localUpdatedAt||Date.now(), tsISO=new Date(ts).toISOString(), uid=auth.userId();
     const rowData={ data:db, updated_at:tsISO, device:(navigator.userAgent||'').slice(0,60) };
-    await sbAuthed('/rest/v1/carnets?on_conflict=user_id', {method:'POST', headers:{'Prefer':'resolution=ignore-duplicates,return=minimal'}, body:JSON.stringify([Object.assign({user_id:uid}, rowData)])});
-    const r=await sbAuthed('/rest/v1/carnets?user_id=eq.'+uid+'&updated_at=lt.'+encodeURIComponent(tsISO), {method:'PATCH', headers:{'Prefer':'return=minimal'}, body:JSON.stringify(rowData)});
-    pushing=false;
-    if(r.ok){ const mm=meta(); mm.lastSyncedAt=ts; setMeta(mm); return true; }
-    return false;
+    const ins=await sbAuthed('/rest/v1/carnets?on_conflict=user_id', {method:'POST', headers:{'Prefer':'resolution=ignore-duplicates,return=representation'}, body:JSON.stringify([Object.assign({user_id:uid}, rowData)])});
+    if(!ins.ok) return false;                                    /* réseau/serveur KO */
+    let wrote = Array.isArray(ins.data) && ins.data.length>0;    /* ligne insérée (elle était absente) */
+    if(!wrote){                                                  /* ligne déjà présente → update conditionnel */
+      const upd=await sbAuthed('/rest/v1/carnets?user_id=eq.'+uid+'&updated_at=lt.'+encodeURIComponent(tsISO), {method:'PATCH', headers:{'Prefer':'return=representation'}, body:JSON.stringify(rowData)});
+      if(!upd.ok) return false;
+      wrote = Array.isArray(upd.data) && upd.data.length>0;
+      if(!wrote) return 'stale';                                 /* 0 ligne = serveur PLUS RÉCENT → nos données ne sont pas passées */
+    }
+    const mm=meta(); mm.lastSyncedAt=ts; setMeta(mm); return true;
+  }
+  async function push(){
+    if(!auth.isLogged()) return false;
+    if(pushing) return pushInflight;                             /* coalescer les appels concurrents (évite un faux "false" à flush) */
+    pushing=true;
+    pushInflight=(async ()=>{
+      let res=await doPush();
+      if(res==='stale'){                                         /* réconcilier SANS perte : fusionner le serveur puis re-pousser */
+        const s=await fetchServer();
+        if(s.net && s.row && s.row.data){ mergeDaysInto(db, normalizeDb(s.row.data)); db=normalizeDb(db); writeLocal(); }
+        const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+        res=await doPush();                                      /* notre horodatage > serveur → le PATCH écrit la fusion */
+        renderAll();
+      }
+      return res===true;
+    })();
+    try{ return await pushInflight; } finally{ pushing=false; pushInflight=null; }
   }
   function schedulePush(){
     const m=meta(); m.localUpdatedAt=Date.now(); setMeta(m);   /* toujours horodater, même en solo (protège les données solo) */
@@ -2213,14 +2240,16 @@ $('wcGuest').addEventListener('click', enterGuest);
 $('wcLogin').addEventListener('click', openLogin);
 $('lockLogin').addEventListener('click', openLogin);
 /* Fin de session (déconnexion manuelle OU refresh invalidé) : purge le carnet du compte, re-verrouille l'UI (invité) et informe. */
+let invalidTimer=null;
 function sessionEnded(msg){
+  if(invalidTimer){ clearTimeout(invalidTimer); invalidTimer=null; }   /* annule un teardown différé en attente (évite un double message contradictoire) */
   carnet.release();
   try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ }
   renderAccount(); renderAll();
   if(msg) toast(msg);
 }
-/* Si un refresh échoue (session révoquée/expirée) : teardown différé (hors de toute pile claim/pull en cours) et seulement si toujours déconnecté. */
-auth.setOnInvalid(function(){ setTimeout(function(){ if(!auth.isLogged()) sessionEnded('Session expirée — reconnecte-toi pour synchroniser'); }, 0); });
+/* Si un refresh échoue (session révoquée/expirée) : teardown différé (hors de toute pile claim/pull/flush en cours) et seulement si toujours déconnecté. */
+auth.setOnInvalid(function(){ if(invalidTimer) clearTimeout(invalidTimer); invalidTimer=setTimeout(function(){ invalidTimer=null; if(!auth.isLogged()) sessionEnded('Session expirée — reconnecte-toi pour synchroniser'); }, 0); });
 function renderAccount(){
   const el=$('accountBody'); if(!el) return;
   if(auth.isLogged()){
