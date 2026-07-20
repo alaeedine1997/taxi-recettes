@@ -505,6 +505,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   #welcomeScreen .wbtn.primary{background:#B14A28;border-color:#B14A28;color:#fff}
   #welcomeScreen .wbtn.ghost{background:transparent;border-color:#EAE0CE;color:#241C12}
   nav.tabs button.lockedtab{opacity:.5}
+  .muted{color:var(--text2)}
   body.guest #pdfBtn{display:none!important}
   #welcomeScreen .note{font-size:13px;color:#7C6F5B;margin-top:4px;line-height:1.45}
   @media (prefers-color-scheme:dark){
@@ -706,6 +707,31 @@ function normalizeDb(d){
     if(d.taxi.methode==='S'||d.taxi.methode==='D') out.taxi.methode=d.taxi.methode;
   }
   return out;
+}
+/* Fusion NON destructive : union des jours et des courses/charges par id.
+   `base` est prioritaire sur les champs scalaires (km, horaires) ; on n'ajoute que ce qui manque.
+   Sert à récupérer une saisie invité ou une sauvegarde hors-ligne sans jamais écraser de données. */
+function mergeDaysInto(base, extra){
+  if(!extra || typeof extra!=='object' || !extra.days || typeof extra.days!=='object') return base;
+  if(!base.days) base.days = {};
+  for(const k of Object.keys(extra.days)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+    const ed = extra.days[k];
+    if(!ed || typeof ed!=='object') continue;
+    if(!base.days[k]){ base.days[k] = ed; continue; }
+    const bd = base.days[k];
+    if(bd.kmStart==null && ed.kmStart!=null) bd.kmStart = ed.kmStart;
+    if(bd.kmEnd==null   && ed.kmEnd!=null)   bd.kmEnd   = ed.kmEnd;
+    if(!bd.openedAt && ed.openedAt) bd.openedAt = ed.openedAt;
+    if(!bd.closedAt && ed.closedAt) bd.closedAt = ed.closedAt;
+    if(!Array.isArray(bd.rides)) bd.rides = [];
+    const rid = new Set(bd.rides.map(r=>r&&r.id));
+    (Array.isArray(ed.rides)?ed.rides:[]).forEach(r=>{ if(r && !rid.has(r.id)) bd.rides.push(r); });
+    if(!Array.isArray(bd.charges)) bd.charges = [];
+    const cid = new Set(bd.charges.map(c=>c&&c.id));
+    (Array.isArray(ed.charges)?ed.charges:[]).forEach(c=>{ if(c && !cid.has(c.id)) bd.charges.push(c); });
+  }
+  return base;
 }
 function loadDb(){
   try{
@@ -1965,6 +1991,8 @@ const AUTH_KEY = 'taxiAuthV1';
 
 const auth = (function(){
   let session = null;   /* {access_token, refresh_token, expires_at, user, profile:{username,role,display_name}} */
+  let onInvalid = null;   /* appelé quand un refresh échoue (session révoquée/expirée) → teardown UI + données */
+  function setOnInvalid(fn){ onInvalid = fn; }
   function load(){ try{ session = JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); }catch(_){ session=null; } }
   function save(){ try{ localStorage.setItem(AUTH_KEY, JSON.stringify(session)); }catch(_){ } }
   function clear(){ session=null; try{ localStorage.removeItem(AUTH_KEY); }catch(_){ } }
@@ -2014,7 +2042,7 @@ const auth = (function(){
     if(!session||!session.refresh_token) return false;
     const r = await api('/auth/v1/token?grant_type=refresh_token', {method:'POST', body:JSON.stringify({refresh_token:session.refresh_token})});
     if(r.netError) return false;                 /* hors-ligne : on garde la session */
-    if(!r.ok){ clear(); return false; }          /* refresh invalide : vraie déconnexion */
+    if(!r.ok){ clear(); if(onInvalid){ try{ onInvalid(); }catch(_){ } } return false; }   /* refresh invalide : vraie déconnexion → teardown */
     session.access_token=r.data.access_token; session.refresh_token=r.data.refresh_token;
     session.expires_at=Date.now()+(r.data.expires_in||3600)*1000; save();
     return true;
@@ -2026,7 +2054,7 @@ const auth = (function(){
   }
   function logout(){ clear(); renderAccount(); }
   load();
-  return {isLogged, role, username, login, logout, ensureFresh,
+  return {isLogged, role, username, login, logout, ensureFresh, setOnInvalid,
     token:()=>session&&session.access_token, userId:()=>session&&session.user&&session.user.id};
 })();
 
@@ -2038,6 +2066,10 @@ const carnet = (function(){
   function setMeta(m){ try{ localStorage.setItem(SYNC_META, JSON.stringify(m)); }catch(_){ } }
   function writeLocal(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }catch(_){ } }
   function backup(who){ try{ localStorage.setItem(STORE_KEY+'_backup_'+(who||'x'), JSON.stringify(db)); }catch(_){ } }
+  function readBackup(who){ try{ return JSON.parse(localStorage.getItem(STORE_KEY+'_backup_'+(who||'x'))||'null'); }catch(_){ return null; } }
+  function dropBackup(who){ try{ localStorage.removeItem(STORE_KEY+'_backup_'+(who||'x')); }catch(_){ } }
+  /* FLUSH : pousse immédiatement toute écriture en attente (annule le debounce). Renvoie true si le serveur a bien reçu. */
+  async function flush(){ if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } return await push(); }
   async function sbAuthed(path, opts){
     if(!(await auth.ensureFresh())) return {ok:false, netError:true};
     opts=opts||{};
@@ -2082,12 +2114,23 @@ const carnet = (function(){
     const s=await fetchServer(); if(!s.net) return;   /* hors-ligne : on garde le local */
     const m=meta();
     if(m.unverified){   /* identité venue d'un login hors-ligne : le carnet du compte n'a jamais été comparé */
-      if(s.row && s.row.data){   /* le compte a un carnet serveur → priorité au compte (comme en ligne), local sauvegardé */
+      if(s.row && s.row.data){   /* le compte a un carnet serveur → on l'adopte MAIS on fusionne la saisie hors-ligne (sans perte) */
         backup(m.ownerId||'unv');
+        const localCopy = JSON.parse(JSON.stringify(db));
+        const hadLocalDays = Object.keys((localCopy.days)||{}).length>0;
         adopt(s.row.data, Date.parse(s.row.updated_at)||Date.now());
-        const mm=meta(); delete mm.unverified; setMeta(mm); toast('Carnet du compte récupéré');
+        if(hadLocalDays){
+          mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal();
+          const mm=meta(); mm.localUpdatedAt=Date.now(); delete mm.unverified; setMeta(mm);
+          renderAll(); const okp=await push();
+          if(okp){ dropBackup('unv'); dropBackup(m.ownerId); }
+          toast('Carnet fusionné (compte + saisie hors-ligne)');
+        } else {
+          const mm=meta(); delete mm.unverified; setMeta(mm); dropBackup('unv'); dropBackup(m.ownerId); toast('Carnet du compte récupéré');
+        }
       } else {   /* compte vide → le carnet local (solo) devient celui du compte */
-        const mm=meta(); delete mm.unverified; mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm); push();
+        const mm=meta(); delete mm.unverified; mm.localUpdatedAt=mm.localUpdatedAt||Date.now(); setMeta(mm);
+        const okp=await push(); if(okp){ dropBackup('unv'); dropBackup(m.ownerId); }
       }
       return;
     }
@@ -2117,23 +2160,41 @@ const carnet = (function(){
       renderAll(); return;
     }
     setMeta({ownerId:userId});
-    if(s.row && s.row.data){                                /* le compte a déjà un carnet → on l'adopte */
+    const acctBackup = readBackup(userId);                  /* sauvegarde d'une déconnexion hors-ligne de ce compte (données non synchronisées) */
+    if(s.row && s.row.data){                                /* le compte a déjà un carnet → on l'adopte SANS jeter la saisie invité */
       adopt(s.row.data, Date.parse(s.row.updated_at)||Date.now());
-      if(soloHadDays) toast('Données locales mises de côté (compte prioritaire)');
-    } else {                                                /* serveur vide → on rattache le solo (ou carnet vierge) */
-      db=normalizeDb(soloDb||freshDb()); writeLocal();
+      let recovered=false;
+      if(soloHadDays){ mergeDaysInto(db, soloDb); recovered=true; }
+      if(acctBackup){ mergeDaysInto(db, acctBackup); recovered=true; }
+      if(recovered){
+        db=normalizeDb(db); writeLocal();
+        const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
+        renderAll(); const okp=await push();
+        if(okp){ dropBackup('solo'); dropBackup(userId); }
+        if(soloHadDays) toast('Tes courses invité ont été fusionnées à ton compte');
+      } else {
+        dropBackup('solo'); dropBackup(userId);            /* rien à récupérer : l'adopt serveur fait autorité */
+      }
+    } else {                                                /* serveur vide → on rattache le solo (+ éventuelle sauvegarde) */
+      db=normalizeDb(soloDb||freshDb());
+      if(acctBackup) mergeDaysInto(db, acctBackup);
+      db=normalizeDb(db); writeLocal();
       const mm=meta(); mm.localUpdatedAt=Date.now(); setMeta(mm);
-      renderAll(); push();
+      renderAll(); const okp=await push();
+      if(okp){ dropBackup('solo'); dropBackup(userId); }
       if(soloHadDays) toast('Tes données ont été rattachées à ton compte');
     }
   }
   /* RELEASE : à la déconnexion. Revient à un carnet solo vierge (les données du compte sont sur le serveur + sauvegardées). */
   function release(){
-    backup(meta().ownerId||'me');                          /* sauvegarde inconditionnelle avant de vider */
+    const m=meta();
+    const unsynced = (m.localUpdatedAt||0) > (m.lastSyncedAt||0);
+    if(unsynced) backup(m.ownerId||'me');                   /* filet de secours SEULEMENT si des données ne sont pas encore sur le serveur */
+    else if(m.ownerId) dropBackup(m.ownerId);              /* tout est synchronisé → pas de résidu du compte en clair sur l'appareil */
     db=freshDb(); writeLocal(); setMeta({ownerId:null});
     renderAll();
   }
-  return { schedulePush, pull, claim, release };
+  return { schedulePush, pull, claim, release, flush };
 })();
 carnetSyncHook = carnet.schedulePush;
 window.addEventListener('online', ()=>{ if(auth.isLogged()) carnet.pull(); });
@@ -2144,13 +2205,23 @@ function hideAuth(){ $('authScreen').classList.remove('show'); }
 function authError(msg){ const e=$('authErr'); if(msg){ e.textContent=msg; e.classList.add('show'); } else { e.classList.remove('show'); e.textContent=''; } }
 /* ---- Accueil : invité vs connexion ---- */
 const ENTRY_KEY='taxiEntryV1';
-function showWelcome(){ $('welcomeScreen').classList.add('show'); }
-function hideWelcome(){ $('welcomeScreen').classList.remove('show'); }
+function bgInert(on){ ['.wrap','nav.tabs'].forEach(sel=>{ const el=document.querySelector(sel); if(el) el.inert=!!on; }); }
+function showWelcome(){ const w=$('welcomeScreen'); bgInert(true); w.classList.add('show'); setTimeout(()=>{ const b=w.querySelector('button'); if(b){ try{ b.focus(); }catch(_){ } } },60); }
+function hideWelcome(){ $('welcomeScreen').classList.remove('show'); bgInert(false); }
 function enterGuest(){ try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ } hideWelcome(); hideAuth(); renderAll(); }
 function openLogin(){ hideWelcome(); authError(''); $('authUser').value=''; $('authPass').value=''; showAuth(true); }
 $('wcGuest').addEventListener('click', enterGuest);
 $('wcLogin').addEventListener('click', openLogin);
 $('lockLogin').addEventListener('click', openLogin);
+/* Fin de session (déconnexion manuelle OU refresh invalidé) : purge le carnet du compte, re-verrouille l'UI (invité) et informe. */
+function sessionEnded(msg){
+  carnet.release();
+  try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ }
+  renderAccount(); renderAll();
+  if(msg) toast(msg);
+}
+/* Si un refresh échoue (session révoquée/expirée) : teardown différé (hors de toute pile claim/pull en cours) et seulement si toujours déconnecté. */
+auth.setOnInvalid(function(){ setTimeout(function(){ if(!auth.isLogged()) sessionEnded('Session expirée — reconnecte-toi pour synchroniser'); }, 0); });
 function renderAccount(){
   const el=$('accountBody'); if(!el) return;
   if(auth.isLogged()){
@@ -2167,7 +2238,13 @@ function renderAccount(){
 }
 $('accountBody').addEventListener('click', e=>{
   if(e.target.closest('#accLogin')){ authError(''); $('authUser').value=''; $('authPass').value=''; showAuth(true); }
-  if(e.target.closest('#accLogout')){ if(confirm('Se déconnecter de ton compte ?')){ auth.logout(); carnet.release(); try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ } renderAll(); toast('Déconnecté'); } }
+  if(e.target.closest('#accLogout')){ if(confirm('Se déconnecter de ton compte ?')){ (async ()=>{
+    const okFlush = await carnet.flush();                 /* pousse d'abord toute recette non encore synchronisée */
+    let mm={}; try{ mm=JSON.parse(localStorage.getItem(SYNC_META)||'{}'); }catch(_){ }
+    const unsynced = (mm.localUpdatedAt||0) > (mm.lastSyncedAt||0);
+    if(!okFlush && unsynced && !confirm('Des recettes ne sont pas encore synchronisées (hors-ligne). Elles seront gardées sur cet appareil et remises à ta prochaine reconnexion. Se déconnecter quand même ?')) return;
+    auth.logout(); sessionEnded('Déconnecté');
+  })(); } }
 });
 $('authCancel').addEventListener('click', enterGuest);
 $('authEye').addEventListener('click', ()=>{
@@ -2187,7 +2264,11 @@ $('authForm').addEventListener('submit', async e=>{
   else authError(res.msg||'Connexion impossible.');
 });
 renderAccount();
-if(auth.isLogged()) auth.ensureFresh().then(function(){ renderAccount(); if(auth.isLogged()) carnet.claim(auth.userId()); });   /* refresh + resync au démarrage */
+if(auth.isLogged()) auth.ensureFresh().then(function(){
+  renderAccount();
+  if(auth.isLogged()){ renderAll(); carnet.claim(auth.userId()); }   /* refresh + resync au démarrage */
+  else renderAll();                                                  /* session révoquée au refresh : re-verrouillage immédiat ; onInvalid finalise (release + toast) */
+});
 try{ if(!auth.isLogged() && localStorage.getItem(ENTRY_KEY)!=='guest') showWelcome(); }catch(_){ }   /* 1er lancement : écran d'accueil */
 
 /* ============================== INIT ============================== */
