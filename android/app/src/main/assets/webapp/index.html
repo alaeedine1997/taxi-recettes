@@ -772,11 +772,13 @@ function pruneEmptyDays(){
     if(dayIsEmpty(db.days[k])) delete db.days[k];
   }
 }
-/* État de la journée affichée : 'new' (pas ouverte), 'open' (en cours), 'closed' */
+/* État de la journée affichée : 'new' (pas ouverte), 'open' (en cours), 'closed'.
+   Une journée n'est 'closed' que si elle a RÉELLEMENT été ouverte/utilisée (openedAt/closedAt/courses/charges) —
+   saisir seulement le km de départ la garde en 'new' (sinon le bouton « Ouvrir » disparaissait au blur avant le clic). */
 function dayState(){
   if(db.activeDay===state.date) return 'open';
   const d = db.days[state.date];
-  if(d && !dayIsEmpty(d)) return 'closed';
+  if(d && (d.openedAt || d.closedAt || (d.rides&&d.rides.length) || (d.charges&&d.charges.length))) return 'closed';
   return 'new';
 }
 
