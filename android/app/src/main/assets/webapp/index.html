@@ -2120,8 +2120,9 @@ const carnet = (function(){
         if(!s.net){ res=false; }                                 /* serveur illisible → NE PAS re-pousser (sinon on écrase des données plus récentes) ; on réessaiera */
         else {
           const serverT=(s.row && Date.parse(s.row.updated_at))||0;
-          /* serveur plus récent = BASE (ses scalaires km/horaires l'emportent, cohérent avec pull/claim) ; on ré-injecte les courses locales par union d'id */
-          if(s.row && s.row.data){ const localCopy=JSON.parse(JSON.stringify(db)); db=normalizeDb(s.row.data); mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal(); }
+          /* serveur plus récent = BASE pour les scalaires JOUR (km/horaires) ; on ré-injecte les courses locales par union d'id.
+             MAIS les réglages (retenues sources, coût carburant, tarifs taximètre) = autorité de CET appareil (même compte) → on garde le local. */
+          if(s.row && s.row.data){ const localCopy=JSON.parse(JSON.stringify(db)); backup(auth.userId()); db=normalizeDb(s.row.data); mergeDaysInto(db, localCopy); db.sources=localCopy.sources; db.fuelPerKm=localCopy.fuelPerKm; db.taxi=localCopy.taxi; db=normalizeDb(db); writeLocal(); }
           bumpLocal(serverT+1);                                  /* horodatage monotone, borné au-dessus du serveur */
           res=await doPush();                                    /* notre horodatage > serveur → le PATCH écrit la fusion */
           renderAll();
@@ -2188,7 +2189,9 @@ const carnet = (function(){
           backup(m.ownerId||'me');
           const localCopy=JSON.parse(JSON.stringify(db));
           adopt(s.row.data, serverT);
-          mergeDaysInto(db, localCopy); db=normalizeDb(db); writeLocal();
+          mergeDaysInto(db, localCopy);
+          db.sources=localCopy.sources; db.fuelPerKm=localCopy.fuelPerKm; db.taxi=localCopy.taxi;   /* réglages = autorité de CET appareil (même compte) */
+          db=normalizeDb(db); writeLocal();
           bumpLocal();
           renderAll(); const okp=await push(); if(okp) dropBackup(m.ownerId||'me');
           toast('Carnet fusionné (serveur + saisie hors-ligne)');
