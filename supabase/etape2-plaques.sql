@@ -107,6 +107,11 @@ begin
   or new.started_at is distinct from old.started_at then
     raise exception 'plate_sessions : seul ended_at est modifiable';
   end if;
+  -- ended_at est UNIDIRECTIONNEL : on peut clôturer (NULL→date) mais pas ré-ouvrir (date→NULL).
+  -- Sinon un chauffeur ressusciterait sa session close sur une plaque désactivée / annulerait une libération patron.
+  if old.ended_at is not null and new.ended_at is null then
+    raise exception 'plate_sessions : une session close ne peut pas être rouverte (reprends la plaque)';
+  end if;
   return new;
 end $$;
 drop trigger if exists plate_session_lock on public.plate_sessions;
