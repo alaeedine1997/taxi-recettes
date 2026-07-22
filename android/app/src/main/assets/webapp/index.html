@@ -2550,7 +2550,12 @@ function renderAccount(){
   const el=$('accountBody'); if(!el) return;
   if(auth.isLogged()){
     const u=auth.username()||'?';
+    const r=auth.role();
+    const boss = (r==='patron'||r==='superadmin')
+      ? '<div class="note" style="margin-top:0">Tu es <strong>'+esc(roleLabel(r))+'</strong> — pour gérer ta flotte (plaques, carte GPS, réglages, comptes), va sur l\'espace web : <strong>alaeedine1997.github.io/taxi-recettes/dashboard.html</strong></div>'
+      : '';
     el.innerHTML =
+      boss +
       '<div class="acc-line"><div class="acc-avatar">'+esc((u[0]||'?').toUpperCase())+'</div>'+
       '<div><div class="acc-name">'+esc(u)+'</div><div class="acc-role">'+roleLabel(auth.role())+'</div></div></div>'+
       '<button type="button" class="btn btn-ghost btn-full" id="accLogout">Se déconnecter</button>';
