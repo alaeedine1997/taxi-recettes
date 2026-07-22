@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin=""></script>
 <style>
   :root{
     --bg:#FAF5EC; --surface:#FFFFFF; --ink:#241C12; --muted:#7C6F5B;
@@ -77,6 +79,9 @@
   .empty{color:var(--muted);font-size:14px;padding:14px 4px}
   .muted{color:var(--muted)}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+  #map{height:380px;border-radius:12px;margin-top:12px;z-index:0}
+  #mapReplay{max-width:260px}
+  .leaflet-container{font-family:var(--sans)}
   .note{font-size:13px;color:var(--muted);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:11px 13px}
   .err{color:var(--danger);font-size:13.5px;margin-top:8px;min-height:1px}
 
@@ -155,6 +160,19 @@
       <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
     </div>
 
+    <!-- Carte GPS en direct -->
+    <div class="card hidden" id="mapCard">
+      <h2>Carte en direct</h2>
+      <p class="hint">Position des plaques en service (le chauffeur a pris sa plaque et partagé sa position).</p>
+      <div class="frow">
+        <select id="mapFleet" class="hidden"></select>
+        <select id="mapReplay"><option value="">— Trajet du jour : choisir une plaque —</option></select>
+        <button class="btn sm" id="mapLiveBtn">↻ Rafraîchir</button>
+        <span class="muted" id="mapStatus"></span>
+      </div>
+      <div id="map"></div>
+    </div>
+
     <!-- Comptes -->
     <div class="card" id="accountsCard">
       <h2>Comptes</h2>
@@ -218,7 +236,7 @@ async function login(user, pass){
   if(!(session.profile.role==='superadmin'||session.profile.role==='patron')){ clearSession(); return {ok:false, msg:'Cet espace est réservé aux patrons et administrateurs.'}; }
   return {ok:true};
 }
-function logout(){ clearSession(); showLogin(); }
+function logout(){ stopPoll(); clearSession(); showLogin(); }
 
 /* ---- vues ---- */
 function showLogin(){ $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
@@ -247,7 +265,7 @@ async function loadFleets(){
   const el=$('fleetsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
-  _fleetsCache=fleets; fillNpFleet();   /* alimente le sélecteur de flotte pour l'ajout de plaque (superadmin) */
+  _fleetsCache=fleets; fillNpFleet(); setupMapCard();   /* sélecteur plaque + carte GPS */
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -373,6 +391,74 @@ $('platesList').addEventListener('click', async e=>{
   b.disabled=false;
   if(r.ok){ toast(active?'Plaque réactivée':'Plaque désactivée'); loadPlates(); } else toast('Échec');
 });
+
+/* ---- carte GPS (Étape 3) ---- */
+let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null;
+function ensureMap(){
+  if(_map) return _map;
+  if(typeof L==='undefined'){ return null; }
+  _map=L.map('map',{zoomControl:true}).setView([50.8503,4.3517],11);   // Bruxelles par défaut
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(_map);
+  _liveLayer=L.layerGroup().addTo(_map); _replayLayer=L.layerGroup().addTo(_map);
+  return _map;
+}
+function currentMapFleet(){
+  return session.profile.role==='superadmin' ? ($('mapFleet').value||null) : session.profile.fleet_id;
+}
+function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
+async function loadLive(){
+  const fid=currentMapFleet(); if(!fid || !_map) return;
+  const since=new Date(Date.now()-10*60000).toISOString();
+  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
+  if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
+  const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
+  _liveLayer.clearLayers(); const pts=[];
+  Object.keys(latest).forEach(k=>{ const p=latest[k];
+    const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
+    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+'<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+'</span>'));
+    pts.push([p.lat,p.lng]);
+  });
+  $('mapStatus').textContent = pts.length ? (pts.length+' plaque'+(pts.length>1?'s':'')+' en service') : 'Aucune plaque en service';
+  if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(_){ } }
+}
+async function loadReplay(plateId){
+  if(!_replayLayer) return;
+  _replayLayer.clearLayers();
+  if(!plateId) return;
+  const start=new Date(); start.setHours(0,0,0,0);
+  const r=await api('/rest/v1/positions?select=lat,lng&plate_id=eq.'+plateId+'&recorded_at=gte.'+start.toISOString()+'&order=recorded_at.asc&limit=3000');
+  if(!r.ok){ toast('Trajet indisponible'); return; }
+  const pts=(r.data||[]).map(p=>[p.lat,p.lng]);
+  if(!pts.length){ toast('Aucun trajet aujourd\'hui pour cette plaque'); return; }
+  _replayLayer.addLayer(L.polyline(pts,{color:'#B14A28',weight:4,opacity:.85}));
+  _replayLayer.addLayer(L.circleMarker(pts[0],{radius:6,color:'#4F7A43',fillColor:'#4F7A43',fillOpacity:1}).bindPopup('Départ'));
+  _replayLayer.addLayer(L.circleMarker(pts[pts.length-1],{radius:6,color:'#B4362B',fillColor:'#B4362B',fillOpacity:1}).bindPopup('Dernier point'));
+  try{ _map.fitBounds(pts,{padding:[40,40]}); }catch(_){ }
+}
+async function fillReplayPlates(){
+  const fid=currentMapFleet(), sel=$('mapReplay');
+  if(!fid){ sel.innerHTML='<option value="">—</option>'; return; }
+  const r=await api('/rest/v1/plates?select=id,label&fleet_id=eq.'+fid+'&order=label.asc');
+  sel.innerHTML='<option value="">— Trajet du jour : choisir une plaque —</option>'+
+    ((r.ok&&r.data)?r.data:[]).map(p=>'<option value="'+p.id+'">'+esc(p.label)+'</option>').join('');
+}
+function setupMapCard(){
+  const isAdmin=session.profile.role==='superadmin';
+  const myFleet=_fleetsCache.find(f=>f.id===session.profile.fleet_id)||null;
+  const show = isAdmin || (myFleet && !myFleet.suspended && (myFleet.opt_gps_live||myFleet.opt_replay));
+  $('mapCard').classList.toggle('hidden', !show);
+  stopPoll();
+  if(!show) return;
+  if(!ensureMap()){ $('mapStatus').textContent='Carte indisponible (Leaflet non chargé).'; return; }
+  $('mapFleet').classList.toggle('hidden', !isAdmin);
+  if(isAdmin) $('mapFleet').innerHTML=_fleetsCache.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('');
+  setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
+  fillReplayPlates(); loadLive();
+  _pollTimer=setInterval(loadLive, 8000);
+}
+$('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
+$('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
+$('mapLiveBtn').addEventListener('click', loadLive);
 
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{
