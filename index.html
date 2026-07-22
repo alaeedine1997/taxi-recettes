@@ -412,6 +412,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   <div class="card">
     <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Sources &amp; retenues</h2>
     <div id="srcSettings"></div>
+    <div class="fleet-note">🔒 Ces sources et retenues sont fixées par ton patron (flotte) — tu ne peux pas les modifier.</div>
     <div class="note">La retenue s'applique uniquement aux courses payées en <strong>cash</strong>, <strong>SumUp</strong> ou <strong>chèque taxi</strong>. Les courses payées par l'app ou facturées sont enregistrées en net (retenue 0). Modifier un taux ne change pas les anciennes courses.</div>
   </div>
 
@@ -422,6 +423,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <input type="text" id="fuelRate" inputmode="decimal" placeholder="ex : 0,12" aria-label="Coût du carburant par kilomètre en euros">
       <span style="font-weight:700;color:var(--text2);white-space:nowrap">€ / km</span>
     </div>
+    <div class="fleet-note">🔒 Le coût du carburant est fixé par ton patron (flotte).</div>
     <div class="note">Le carburant est calculé tout seul : kilomètres du jour (ou du mois) × ce montant. Laissez vide (ou 0) pour ne pas l'afficher. Les dépenses ponctuelles (lavage, entretien…) se notent séparément dans « Charges ».</div>
   </div>
 
@@ -432,7 +434,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     <div class="note">Le compteur bascule tout seul entre le tarif au km (en roulant) et le tarif d'attente (à l'arrêt). Défaut Bruxelles : 2,60 € + 2,30 €/km + attente 0,60 €/min, minimum 8 €. Ajuste selon ton compteur réel.</div>
   </div>
 
-  <div class="card">
+  <div class="card" id="addSrcCard">
     <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Ajouter une source</h2>
     <div class="row2">
       <input type="text" id="newSrcName" placeholder="Nom — ex : Aéroport" aria-label="Nom de la nouvelle source">
@@ -507,6 +509,9 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   #welcomeScreen .wbtn.ghost{background:transparent;border-color:#EAE0CE;color:#241C12}
   nav.tabs button.lockedtab{opacity:.5}
   .muted{color:var(--text2)}
+  .fleet-note{display:none;font-size:13px;font-weight:600;color:var(--accent);background:var(--card2,rgba(177,74,40,.07));border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-top:10px}
+  body.fleet-managed .fleet-note{display:block}
+  body.fleet-managed #addSrcCard{display:none}
   body.guest #pdfBtn{display:none!important}
   /* ---- Prise de plaque ---- */
   .platebar{display:flex;align-items:center;gap:12px;padding:13px 15px}
@@ -1152,17 +1157,20 @@ function renderHistory(){
   }).join('');
 }
 function renderSettings(){
+  const locked = (typeof fleetCfg==='object') && fleetCfg.isManaged();   /* chauffeur de flotte : sources & carburant fixés par le patron */
+  document.body.classList.toggle('fleet-managed', locked);
   $('srcSettings').innerHTML = db.sources.map(s=>
     '<div class="src-row">'+
-    '<input type="text" class="srcname" value="'+esc(s.name)+'" data-name="'+esc(s.id)+'" aria-label="Nom de la source">'+
+    '<input type="text" class="srcname" value="'+esc(s.name)+'" data-name="'+esc(s.id)+'" aria-label="Nom de la source"'+(locked?' disabled':'')+'>'+
     (s.appCash
       ? '<span class="pct" style="min-width:auto;font-size:12px;white-space:nowrap;color:var(--text2)">app + cash</span>'
-      : '<input type="text" class="srate" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'">'+
+      : '<input type="text" class="srate" inputmode="decimal" value="'+Number(s.rate)+'" data-rate="'+esc(s.id)+'" aria-label="Retenue en pourcent pour '+esc(s.name)+'"'+(locked?' disabled':'')+'>'+
         '<span class="pct">%</span>')+
-    '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>'+
+    (locked ? '' : '<button type="button" class="icon-btn danger" data-del-src="'+esc(s.id)+'" aria-label="Supprimer la source '+esc(s.name)+'">'+TRASH+'</button>')+
     '</div>'
   ).join('');
   $('fuelRate').value = fuelRate()>0 ? String(db.fuelPerKm).replace('.',',') : '';
+  $('fuelRate').disabled = locked;
   const TAXI_FIELDS = [
     ['priseEnCharge','Prise en charge','€'],['tarifKm','Tarif au km','€/km'],
     ['tarifMinute','Tarif attente','€/min'],['minimumCourse','Minimum course','€']
@@ -1407,6 +1415,7 @@ $('monthPdfBtn').addEventListener('click', ()=>{
     .then(ok=>{ if(ok) toast('PDF du mois prêt'); });
 });
 $('srcSettings').addEventListener('change', e=>{
+  if(fleetCfg.isManaged()) return;   /* réglages fixés par le patron */
   const nameInp = e.target.closest('[data-name]');
   if(nameInp){
     const s = sourceOf(nameInp.dataset.name);
@@ -1436,6 +1445,7 @@ $('srcSettings').addEventListener('change', e=>{
   if(ok) toast(s.name+' : retenue '+nf.format(s.rate)+' % (courses futures)');
 });
 $('fuelRate').addEventListener('change', e=>{
+  if(fleetCfg.isManaged()) return;   /* carburant fixé par le patron */
   const raw = String(e.target.value).trim();
   if(raw===''){ db.fuelPerKm = 0; }
   else {
@@ -1470,7 +1480,7 @@ $('taxiPresetBxl').addEventListener('click', ()=>{
 });
 $('srcSettings').addEventListener('click', e=>{
   const b = e.target.closest('[data-del-src]');
-  if(!b) return;
+  if(!b || fleetCfg.isManaged()) return;
   const s = sourceOf(b.dataset.delSrc);
   if(!s) return;
   if(db.sources.length<=1){ toast('Garde au moins une source'); return; }
@@ -1480,6 +1490,7 @@ $('srcSettings').addEventListener('click', e=>{
   saveDb(); renderAll();
 });
 $('addSrcBtn').addEventListener('click', ()=>{
+  if(fleetCfg.isManaged()){ toast('Les sources sont gérées par ton patron'); return; }
   const name = $('newSrcName').value.trim();
   if(!name){ toast('Donnez un nom à la source'); $('newSrcName').focus(); return; }
   let rate = Number(String($('newSrcRate').value).trim().replace(',','.'));
@@ -2476,6 +2487,39 @@ function ensureGeoThenStart(){
   geo.sync();
 }
 
+/* ===================== RÉGLAGES DE FLOTTE (Étape 4 — sources & carburant fixés par le patron) ===================== */
+const fleetCfg=(function(){
+  let managed=false;
+  function isManaged(){ return managed; }
+  function normSources(arr){
+    return (Array.isArray(arr)?arr:[]).filter(s=>s&&s.id&&s.name).map(s=>{
+      const appCash=!!s.appCash;
+      return {id:String(s.id), name:String(s.name), rate:appCash?0:Math.min(100,Math.max(0,Number(s.rate)||0)), builtin:!!s.builtin, appCash};
+    });
+  }
+  /* Applique la config de la flotte (sources + carburant) pour un chauffeur rattaché.
+     La flotte fait AUTORITÉ : on écrase les réglages locaux, sans déclencher de push carnet. */
+  async function apply(){
+    const was=managed; managed=false;
+    if(!(auth.isLogged() && auth.role()==='chauffeur' && auth.fleetId())){ if(was) renderSettings(); return; }
+    if(!(await auth.ensureFresh())) return;
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/fleet_config?select=sources,fuel_per_km&fleet_id=eq.'+encodeURIComponent(auth.fleetId()),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+auth.token()}});
+      if(!r.ok) return;
+      const d=await r.json();
+      if(Array.isArray(d) && d.length){
+        const cfg=d[0], src=normSources(cfg.sources);
+        if(src.length) db.sources=src;
+        db.fuelPerKm=(isFinite(Number(cfg.fuel_per_km))&&Number(cfg.fuel_per_km)>=0)?Number(cfg.fuel_per_km):0;
+        managed=true;
+        try{ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }catch(_){ }
+        renderAll();
+      }
+    }catch(_){ }
+  }
+  return { isManaged, apply };
+})();
+
 function roleLabel(r){ return r==='superadmin'?'Super Admin':(r==='patron'?'Patron de flotte':(r==='chauffeur'?'Chauffeur':'—')); }
 function showAuth(on){ $('authScreen').classList.toggle('show', on!==false); if(on!==false) setTimeout(()=>$('authUser').focus(),60); }
 function hideAuth(){ $('authScreen').classList.remove('show'); }
@@ -2541,13 +2585,13 @@ $('authForm').addEventListener('submit', async e=>{
   let res; try{ res = await auth.login($('authUser').value, $('authPass').value); }
   catch(_){ res={ok:false, msg:'Une erreur est survenue.'}; }
   btn.disabled=false; btn.classList.remove('loading'); txt.textContent='Se connecter';
-  if(res.ok){ hideAuth(); hideWelcome(); $('authPass').value=''; renderAccount(); renderAll(); toast('Connecté — '+roleLabel(auth.role())); carnet.claim(auth.userId()); plates.refreshActive().then(()=>{ renderPlate(); geo.sync(); }); }
+  if(res.ok){ hideAuth(); hideWelcome(); $('authPass').value=''; renderAccount(); renderAll(); toast('Connecté — '+roleLabel(auth.role())); carnet.claim(auth.userId()).then(()=>fleetCfg.apply()); plates.refreshActive().then(()=>{ renderPlate(); geo.sync(); }); }
   else authError(res.msg||'Connexion impossible.');
 });
 renderAccount();
 if(auth.isLogged()) auth.ensureFresh().then(function(){
   renderAccount();
-  if(auth.isLogged()){ renderAll(); carnet.claim(auth.userId()); plates.refreshActive().then(()=>{ renderPlate(); geo.sync(); }); }   /* refresh + resync au démarrage */
+  if(auth.isLogged()){ renderAll(); carnet.claim(auth.userId()).then(()=>fleetCfg.apply()); plates.refreshActive().then(()=>{ renderPlate(); geo.sync(); }); }   /* refresh + resync au démarrage */
   else renderAll();                                                  /* session révoquée au refresh : re-verrouillage immédiat ; onInvalid finalise (release + toast) */
 });
 try{ if(!auth.isLogged() && localStorage.getItem(ENTRY_KEY)!=='guest') showWelcome(); }catch(_){ }   /* 1er lancement : écran d'accueil */

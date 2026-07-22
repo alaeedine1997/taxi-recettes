@@ -160,6 +160,25 @@
       <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
     </div>
 
+    <!-- Réglages de flotte : sources + carburant -->
+    <div class="card hidden" id="cfgCard">
+      <h2>Réglages de la flotte</h2>
+      <p class="hint">Sources, retenues (%) et coût carburant — appliqués à TOUS tes chauffeurs (ils ne peuvent pas les modifier).</p>
+      <select id="cfgFleet" class="hidden" style="margin-bottom:12px"></select>
+      <div id="cfgSources"></div>
+      <div class="row c3" style="margin-top:10px">
+        <div><label for="cfgNewName">Nouvelle source</label><input id="cfgNewName" placeholder="ex : Aéroport"></div>
+        <div><label for="cfgNewRate">Retenue %</label><input id="cfgNewRate" type="number" min="0" max="100" value="0"></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn" id="cfgAddSrc" style="width:100%">+ Ajouter</button></div>
+      </div>
+      <label class="opt" style="margin-top:8px"><input type="checkbox" id="cfgNewAppCash"> Style Uber / Bolt (« sur l'app + cash », sans commission)</label>
+      <div class="row c2" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+        <div><label for="cfgFuel">Carburant € / km</label><input id="cfgFuel" type="number" min="0" step="0.01" value="0"></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="cfgSave" style="width:100%">Enregistrer les réglages</button></div>
+      </div>
+      <div class="err" id="cfgErr"></div>
+    </div>
+
     <!-- Carte GPS en direct -->
     <div class="card hidden" id="mapCard">
       <h2>Carte en direct</h2>
@@ -279,7 +298,7 @@ async function loadFleets(){
   const el=$('fleetsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
-  _fleetsCache=fleets; fillNpFleet(); setupMapCard(); setupNewUser();   /* sélecteur plaque + carte GPS + création de comptes */
+  _fleetsCache=fleets; fillNpFleet(); setupMapCard(); setupNewUser(); setupCfgCard();   /* plaque + carte GPS + comptes + réglages flotte */
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -473,6 +492,76 @@ function setupMapCard(){
 $('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
 $('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
 $('mapLiveBtn').addEventListener('click', loadLive);
+
+/* ---- réglages de flotte : sources + carburant (Étape 4) ---- */
+let _cfgSrc=[];
+const DEF_SRC=[
+  {id:'uber',name:'Uber',rate:0,builtin:true,appCash:true},
+  {id:'bolt',name:'Bolt',rate:0,builtin:true,appCash:true},
+  {id:'heetch',name:'Heetch',rate:18,builtin:true,appCash:false},
+  {id:'taxivert',name:'Taxis Verts',rate:0,builtin:true,appCash:false},
+  {id:'prive',name:'Course privée',rate:0,builtin:true,appCash:false}
+];
+function currentCfgFleet(){ return session.profile.role==='superadmin' ? ($('cfgFleet').value||null) : session.profile.fleet_id; }
+function renderCfgSources(){
+  $('cfgSources').innerHTML = _cfgSrc.length ? _cfgSrc.map((s,i)=>
+    '<div class="frow" style="gap:8px;margin-top:8px">'+
+      '<input data-cfgname="'+i+'" value="'+esc(s.name)+'" style="flex:1">'+
+      (s.appCash
+        ? '<span class="muted" style="min-width:90px;text-align:center;font-size:13px">app + cash</span>'
+        : '<input data-cfgrate="'+i+'" type="number" min="0" max="100" value="'+Number(s.rate)+'" style="width:76px"><span class="muted">%</span>')+
+      '<button class="btn sm ghost" data-cfgdel="'+i+'" aria-label="Supprimer">✕</button>'+
+    '</div>'
+  ).join('') : '<div class="empty">Aucune source.</div>';
+}
+async function loadCfg(){
+  const fid=currentCfgFleet();
+  if(!fid){ _cfgSrc=[]; renderCfgSources(); return; }
+  const r=await api('/rest/v1/fleet_config?select=sources,fuel_per_km&fleet_id=eq.'+fid);
+  if(r.ok && Array.isArray(r.data) && r.data.length && Array.isArray(r.data[0].sources) && r.data[0].sources.length){
+    _cfgSrc = r.data[0].sources.map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)||0,builtin:!!s.builtin,appCash:!!s.appCash}));
+    $('cfgFuel').value = Number(r.data[0].fuel_per_km)||0;
+  } else if(r.status===404){ $('cfgSources').innerHTML='<div class="empty">Table fleet_config absente — lance le SQL de l\'Étape 4.</div>'; return; }
+  else { _cfgSrc = DEF_SRC.slice(); $('cfgFuel').value=0; }   /* pas encore de config → défauts */
+  renderCfgSources();
+}
+function setupCfgCard(){
+  const isAdmin=session.profile.role==='superadmin';
+  const show = isAdmin || (session.profile.role==='patron' && session.profile.fleet_id);
+  $('cfgCard').classList.toggle('hidden', !show);
+  if(!show) return;
+  $('cfgFleet').classList.toggle('hidden', !isAdmin);
+  if(isAdmin) $('cfgFleet').innerHTML=_fleetsCache.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('');
+  loadCfg();
+}
+$('cfgFleet').addEventListener('change', loadCfg);
+$('cfgSources').addEventListener('input', e=>{
+  const n=e.target.closest('[data-cfgname]'); if(n){ _cfgSrc[+n.dataset.cfgname].name=n.value; return; }
+  const rt=e.target.closest('[data-cfgrate]'); if(rt){ _cfgSrc[+rt.dataset.cfgrate].rate=Math.min(100,Math.max(0,Number(rt.value)||0)); }
+});
+$('cfgSources').addEventListener('click', e=>{
+  const d=e.target.closest('[data-cfgdel]'); if(!d) return;
+  _cfgSrc.splice(+d.dataset.cfgdel,1); renderCfgSources();
+});
+$('cfgAddSrc').addEventListener('click', ()=>{
+  const name=$('cfgNewName').value.trim(); $('cfgErr').textContent='';
+  if(!name){ $('cfgErr').textContent='Donne un nom à la source.'; return; }
+  const appCash=$('cfgNewAppCash').checked;
+  _cfgSrc.push({id:'src'+Date.now(),name,rate:appCash?0:Math.min(100,Math.max(0,Number($('cfgNewRate').value)||0)),builtin:false,appCash});
+  $('cfgNewName').value=''; $('cfgNewRate').value='0'; $('cfgNewAppCash').checked=false;
+  renderCfgSources();
+});
+$('cfgSave').addEventListener('click', async ()=>{
+  const fid=currentCfgFleet(); $('cfgErr').textContent='';
+  if(!fid){ $('cfgErr').textContent='Choisis une flotte.'; return; }
+  if(!_cfgSrc.length){ $('cfgErr').textContent='Garde au moins une source.'; return; }
+  const fuel=Math.max(0,Number($('cfgFuel').value)||0);
+  const b=$('cfgSave'); b.disabled=true; b.textContent='Enregistrement…';
+  const r=await api('/rest/v1/fleet_config?on_conflict=fleet_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{fleet_id:fid, sources:_cfgSrc, fuel_per_km:fuel}])});
+  b.disabled=false; b.textContent='Enregistrer les réglages';
+  if(r.ok) toast('Réglages enregistrés — appliqués aux chauffeurs');
+  else $('cfgErr').textContent = r.status===404?'Table fleet_config absente — lance le SQL Étape 4.':(r.status===401||r.status===403?'Non autorisé.':'Échec de l\'enregistrement.');
+});
 
 /* ---- création de comptes (Étape 4, via Edge Function create-user) ---- */
 function setupNewUser(){
