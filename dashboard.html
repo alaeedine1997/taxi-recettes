@@ -178,8 +178,22 @@
       <h2>Comptes</h2>
       <p class="hint">Les chauffeurs et patrons rattachés.</p>
       <div id="accountsList"><div class="empty">Chargement…</div></div>
-      <div class="note" id="createUserNote" style="margin-top:14px">
-        La création de comptes (patron / chauffeur) se fait via une petite fonction serveur sécurisée — <strong>à activer</strong> (voir la note laissée à l'administrateur). Une fois active, un bouton « Nouveau compte » apparaîtra ici.
+      <div style="margin-top:14px">
+        <button class="btn" id="newUserToggle">+ Nouveau compte</button>
+        <div id="newUserForm" class="hidden" style="margin-top:12px;border-top:1px solid var(--line);padding-top:14px">
+          <div class="row c2">
+            <div><label for="nuUser">Identifiant</label><input id="nuUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : jean"></div>
+            <div><label for="nuName">Nom affiché</label><input id="nuName" placeholder="ex : Jean D."></div>
+          </div>
+          <div class="row c2" style="margin-top:10px">
+            <div><label for="nuPass">Mot de passe</label><input id="nuPass" type="text" placeholder="min. 6 caractères"></div>
+            <div id="nuRoleWrap" class="hidden"><label for="nuRole">Rôle</label><select id="nuRole"><option value="chauffeur">Chauffeur</option><option value="patron">Patron</option></select></div>
+          </div>
+          <div id="nuFleetWrap" class="hidden" style="margin-top:10px"><label for="nuFleet">Flotte</label><select id="nuFleet"></select></div>
+          <button class="btn primary" id="nuCreate" style="margin-top:12px">Créer le compte</button>
+          <div class="err" id="nuErr"></div>
+          <p class="hint" style="margin:10px 0 0">L'identifiant de connexion sera <code id="nuPreview">jean</code>. Communique le mot de passe au chauffeur.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -265,7 +279,7 @@ async function loadFleets(){
   const el=$('fleetsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
-  _fleetsCache=fleets; fillNpFleet(); setupMapCard();   /* sélecteur plaque + carte GPS */
+  _fleetsCache=fleets; fillNpFleet(); setupMapCard(); setupNewUser();   /* sélecteur plaque + carte GPS + création de comptes */
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -459,6 +473,47 @@ function setupMapCard(){
 $('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
 $('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
 $('mapLiveBtn').addEventListener('click', loadLive);
+
+/* ---- création de comptes (Étape 4, via Edge Function create-user) ---- */
+function setupNewUser(){
+  const isAdmin=session.profile.role==='superadmin';
+  $('nuRoleWrap').classList.toggle('hidden', !isAdmin);
+  $('nuFleetWrap').classList.toggle('hidden', !isAdmin);
+  if(isAdmin) $('nuFleet').innerHTML = _fleetsCache.length
+    ? _fleetsCache.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('')
+    : '<option value="">— crée une flotte d\'abord —</option>';
+}
+$('newUserToggle').addEventListener('click', ()=>$('newUserForm').classList.toggle('hidden'));
+$('nuUser').addEventListener('input', ()=>{ $('nuPreview').textContent = $('nuUser').value.trim().toLowerCase()||'…'; });
+$('nuCreate').addEventListener('click', async ()=>{
+  const isAdmin=session.profile.role==='superadmin';
+  const username=$('nuUser').value.trim().toLowerCase(), password=$('nuPass').value, display_name=$('nuName').value.trim();
+  const role=isAdmin?$('nuRole').value:'chauffeur';
+  const fleet_id=isAdmin?$('nuFleet').value:session.profile.fleet_id;
+  $('nuErr').textContent='';
+  if(!/^[a-z0-9._-]{2,32}$/.test(username)){ $('nuErr').textContent='Identifiant : 2 à 32 caractères (a-z, 0-9, . _ -).'; return; }
+  if((password||'').length<6){ $('nuErr').textContent='Mot de passe : 6 caractères minimum.'; return; }
+  if(!fleet_id){ $('nuErr').textContent=isAdmin?'Choisis une flotte.':'Ton compte n\'est rattaché à aucune flotte.'; return; }
+  const b=$('nuCreate'); b.disabled=true; b.textContent='Création…';
+  let r={ok:false,status:0}, d=null;
+  try{
+    await ensureFresh();
+    r=await fetch(SB_URL+'/functions/v1/create-user',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username,password,role,fleet_id,display_name})});
+    try{ d=await r.json(); }catch(_){}
+  }catch(_){ }
+  b.disabled=false; b.textContent='Créer le compte';
+  if(r.ok && d && d.ok){
+    toast('Compte « '+username+' » créé');
+    $('nuUser').value='';$('nuPass').value='';$('nuName').value='';$('nuPreview').textContent='…';
+    $('newUserForm').classList.add('hidden'); loadAccounts();
+  } else {
+    const e=d&&d.error;
+    const map={identifiant_pris:'Cet identifiant est déjà pris.',username_invalide:'Identifiant invalide.',mdp_court:'Mot de passe trop court.',role:'Rôle invalide.',patron_role:'Un patron ne peut créer que des chauffeurs.',patron_sans_flotte:'Ta flotte n\'est pas définie.',forbidden:'Non autorisé.'};
+    $('nuErr').textContent = (r.status===404||r.status===0)
+      ? 'La fonction de création n\'est pas encore déployée sur le serveur (voir site/supabase/DEPLOY.md).'
+      : (map[e]||('Erreur : '+(e||r.status)));
+  }
+});
 
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{
