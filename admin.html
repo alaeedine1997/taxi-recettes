@@ -128,16 +128,21 @@
     <h1 class="page" id="pageTitle">Flottes</h1>
     <p class="sub" id="pageSub">Crée et pilote tes flottes : débloque les options, fixe le nombre de plaques, suspends en un clic.</p>
 
-    <!-- SUPERADMIN : créer une flotte -->
+    <!-- SUPERADMIN : créer une flotte + son patron -->
     <div class="card" id="createFleetCard">
-      <h2>Nouvelle flotte</h2>
-      <p class="hint">Ajoute une flotte, puis débloque ses options selon son abonnement.</p>
-      <div class="row c3">
+      <h2>Nouvelle flotte + son patron</h2>
+      <p class="hint">Une flotte = un patron. Crée les deux d'un coup ; tu débloqueras ses options dans la liste ci-dessous.</p>
+      <div class="row c2">
         <div><label for="nfName">Nom de la flotte</label><input type="text" id="nfName" placeholder="ex : Taxis Étoile"></div>
         <div><label for="nfMax">Plaques max</label><input type="number" id="nfMax" min="0" value="5"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="nfAdd" style="width:100%">Créer</button></div>
       </div>
+      <div class="row c2" style="margin-top:10px">
+        <div><label for="nfPatron">Identifiant du patron</label><input type="text" id="nfPatron" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : etoile"></div>
+        <div><label for="nfPass">Mot de passe du patron</label><input type="text" id="nfPass" placeholder="min. 6 caractères"></div>
+      </div>
+      <button class="btn primary" id="nfAdd" style="width:100%;margin-top:12px">Créer la flotte et son patron</button>
       <div class="err" id="nfErr"></div>
+      <p class="hint" style="margin:8px 0 0">Le patron se connectera sur <strong>patron.html</strong> avec cet identifiant.</p>
     </div>
 
     <!-- Liste des flottes -->
@@ -350,12 +355,42 @@ $('fleetsList').addEventListener('click', async e=>{
   if(await patchFleet(b.dataset.suspend, {suspended:val})){ toast(val?'Flotte suspendue':'Flotte réactivée'); loadFleets(); }
 });
 $('nfAdd').addEventListener('click', async ()=>{
-  const name=$('nfName').value.trim(); $('nfErr').textContent='';
+  const name=$('nfName').value.trim();
+  const pu=$('nfPatron').value.trim().toLowerCase(), pp=$('nfPass').value;
+  $('nfErr').textContent='';
   if(!name){ $('nfErr').textContent='Donne un nom à la flotte.'; return; }
+  if(!/^[a-z0-9._-]{2,32}$/.test(pu)){ $('nfErr').textContent='Identifiant du patron : 2 à 32 caractères (a-z, 0-9, . _ -).'; return; }
+  if((pp||'').length<6){ $('nfErr').textContent='Mot de passe du patron : 6 caractères minimum.'; return; }
   const max=Math.max(0, parseInt($('nfMax').value,10)||0);
-  const r=await api('/rest/v1/fleets',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify([{name,max_plates:max}])});
-  if(!r.ok){ $('nfErr').textContent = r.status===401||r.status===403 ? 'Réservé au super-admin.' : 'Création impossible.'; return; }
-  $('nfName').value=''; toast('Flotte « '+name+' » créée'); loadFleets();
+  const b=$('nfAdd'); b.disabled=true; b.textContent='Création…';
+  /* 1) créer la flotte (récupérer son id) */
+  const rf=await api('/rest/v1/fleets',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify([{name,max_plates:max}])});
+  if(!rf.ok || !Array.isArray(rf.data) || !rf.data.length){
+    b.disabled=false; b.textContent='Créer la flotte et son patron';
+    $('nfErr').textContent = (rf.status===401||rf.status===403) ? 'Réservé au super-admin.' : 'Création de la flotte impossible.'; return;
+  }
+  const fleetId=rf.data[0].id;
+  /* 2) créer le patron de cette flotte (fonction serveur sécurisée) */
+  let r={ok:false,status:0}, d=null;
+  try{
+    await ensureFresh();
+    r=await fetch(SB_URL+'/functions/v1/create-user',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username:pu,password:pp,role:'patron',fleet_id:fleetId,display_name:name})});
+    try{ d=await r.json(); }catch(_){}
+  }catch(_){ }
+  b.disabled=false; b.textContent='Créer la flotte et son patron';
+  if(r.ok && d && d.ok){
+    $('nfName').value='';$('nfPatron').value='';$('nfPass').value='';
+    toast('Flotte « '+name+' » + patron « '+pu+' » créés'); loadFleets();
+  } else {
+    /* le patron a échoué → on annule la flotte pour ne pas laisser d'orpheline */
+    await api('/rest/v1/fleets?id=eq.'+fleetId,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+    const e=d&&d.error;
+    const map={identifiant_pris:'Cet identifiant patron est déjà pris.',mdp_court:'Mot de passe trop court.',username_invalide:'Identifiant patron invalide.'};
+    $('nfErr').textContent = (r.status===404||r.status===0)
+      ? 'La fonction « create-user » n\'est pas encore déployée — impossible de créer le patron (voir DEPLOY.md). Rien n\'a été créé.'
+      : ('Patron non créé ('+(map[e]||e||r.status)+'). Rien n\'a été créé.');
+    loadFleets();
+  }
 });
 
 /* ---- comptes ---- */
