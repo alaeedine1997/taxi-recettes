@@ -374,7 +374,7 @@ $('nfAdd').addEventListener('click', async ()=>{
   let r={ok:false,status:0}, d=null;
   try{
     await ensureFresh();
-    r=await fetch(SB_URL+'/functions/v1/create-user',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username:pu,password:pp,role:'patron',fleet_id:fleetId,display_name:name})});
+    r=await fetch(SB_URL+'/functions/v1/rapid-function',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username:pu,password:pp,role:'patron',fleet_id:fleetId,display_name:name})});
     try{ d=await r.json(); }catch(_){}
   }catch(_){ }
   b.disabled=false; b.textContent='Créer la flotte et son patron';
@@ -635,7 +635,7 @@ $('nuCreate').addEventListener('click', async ()=>{
   let r={ok:false,status:0}, d=null;
   try{
     await ensureFresh();
-    r=await fetch(SB_URL+'/functions/v1/create-user',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username,password,role,fleet_id,display_name})});
+    r=await fetch(SB_URL+'/functions/v1/rapid-function',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username,password,role,fleet_id,display_name})});
     try{ d=await r.json(); }catch(_){}
   }catch(_){ }
   b.disabled=false; b.textContent='Créer le compte';
