@@ -87,6 +87,32 @@
   .note{font-size:13px;color:var(--muted);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:11px 13px}
   .err{color:var(--danger);font-size:13.5px;margin-top:8px;min-height:1px}
 
+  /* vue d'ensemble (KPI) */
+  .ov-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .ov-head h2{margin:0}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--bg)}
+  .kpi .n{font-family:var(--serif);font-weight:600;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:12.5px;color:var(--muted);margin-top:5px;font-weight:600}
+  .kpi .s2{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .kpi.hot{border-color:rgba(79,122,67,.55);background:rgba(79,122,67,.08)}
+  .kpi.hot .n{color:var(--ok)}
+  .ov-live{margin-top:16px}
+  .ov-live h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px;font-weight:700}
+  .live-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:7px;font-size:14px}
+  .live-item .pulse{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:0 0 auto;animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(79,122,67,.45)}70%{box-shadow:0 0 0 8px rgba(79,122,67,0)}100%{box-shadow:0 0 0 0 rgba(79,122,67,0)}}
+  @media(prefers-reduced-motion:reduce){ .live-item .pulse{animation:none} }
+  .live-item .plate{font-weight:700}
+  .live-item .fl{margin-left:auto;font-size:12px;color:var(--muted)}
+  /* détails d'une flotte */
+  .fdetail{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+  .fdetail .drow{display:flex;gap:10px;padding:5px 0;flex-wrap:wrap;font-size:14px}
+  .fdetail .k{color:var(--muted);min-width:104px;font-size:13px;flex:0 0 auto}
+  .fdetail .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line)}
+  .chip.on{border-color:rgba(79,122,67,.55);color:var(--ok);font-weight:600}
+
   /* login */
   #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
   .loginbox{width:100%;max-width:380px;text-align:center}
@@ -129,6 +155,13 @@
   <div class="wrap">
     <h1 class="page" id="pageTitle">Flottes</h1>
     <p class="sub" id="pageSub">Crée et pilote tes flottes : débloque les options, fixe le nombre de plaques, suspends en un clic.</p>
+
+    <!-- SUPERADMIN : vue d'ensemble -->
+    <div class="card hidden" id="overviewCard">
+      <div class="ov-head"><h2>Vue d'ensemble</h2><button class="btn sm ghost" id="ovRefresh">↻ Actualiser</button></div>
+      <div class="kpis" id="kpis"><div class="empty">Chargement…</div></div>
+      <div class="ov-live" id="ovLive"></div>
+    </div>
 
     <!-- SUPERADMIN : créer une flotte + son patron -->
     <div class="card" id="createFleetCard">
@@ -301,6 +334,7 @@ function showApp(){
   $('whoName').textContent=p.username; $('whoRole').textContent=roleLabel(p.role);
   const isAdmin=IS_ADMIN_APP;
   $('pageTitle').textContent = isAdmin ? 'Flottes' : 'Ma flotte';
+  $('overviewCard').classList.toggle('hidden', !isAdmin);   /* vision globale = superadmin */
   $('createFleetCard').classList.toggle('hidden', !isAdmin);
   $('platesCard').classList.toggle('hidden', isAdmin);   /* plaques = opérationnel patron */
   $('fleetsTitle').textContent=isAdmin?'Toutes les flottes':'Ma flotte';
@@ -310,8 +344,11 @@ function showApp(){
   $('fleetsHint').textContent = isAdmin
     ? 'Coche les options débloquées pour chaque flotte. Les changements se sauvent automatiquement.'
     : 'Options débloquées par l\'administrateur (lecture seule).';
-  loadFleets(); loadAccounts();
-  if(!isAdmin) loadPlates();
+  if(isAdmin){
+    Promise.all([loadFleets(), loadAccounts()]).then(loadOverview);
+  } else {
+    loadFleets(); loadAccounts(); loadPlates();
+  }
 }
 
 /* ---- flottes ---- */
@@ -334,7 +371,10 @@ async function loadFleets(){
       '<span class="pill '+(f.suspended?'off':'on')+'">'+(f.suspended?'Suspendue':'Active')+'</span></div>'+
       '<div class="opts">'+opts+'</div>'+
       (isAdmin
-        ? '<div class="frow"><button class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button><span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'
+        ? '<div class="frow"><button class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button>'+
+            '<button class="btn sm ghost" data-fdetail="'+f.id+'">Détails ▾</button>'+
+            '<span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'+
+          '<div class="fdetail hidden" data-fpanel="'+f.id+'"></div>'
         : '<div class="frow"><span class="note" style="border:none;padding:0;background:none">Lecture seule — les options sont réglées par l\'administrateur.</span></div>')+
     '</div>';
   }).join('');
@@ -351,6 +391,13 @@ $('fleetsList').addEventListener('change', async e=>{
   if(mx){ const v=Math.max(0, parseInt(mx.value,10)||0); mx.value=v; if(await patchFleet(mx.dataset.max, {max_plates:v})) toast('Plaques max : '+v); }
 });
 $('fleetsList').addEventListener('click', async e=>{
+  const d=e.target.closest('[data-fdetail]');
+  if(d){
+    const panel=document.querySelector('[data-fpanel="'+d.dataset.fdetail+'"]');
+    if(panel.classList.contains('hidden')){ panel.innerHTML=renderFleetDetail(d.dataset.fdetail); panel.classList.remove('hidden'); d.textContent='Détails ▴'; }
+    else { panel.classList.add('hidden'); d.textContent='Détails ▾'; }
+    return;
+  }
   const b=e.target.closest('[data-suspend]');
   if(!b) return;
   const val=b.dataset.val==='1';
@@ -394,6 +441,62 @@ $('nfAdd').addEventListener('click', async ()=>{
     loadFleets();
   }
 });
+
+/* ---- vue d'ensemble (superadmin) ---- */
+let _platesAll=[], _activeNow=[];
+function kpiTile(n, label, sub, hot){
+  return '<div class="kpi'+(hot?' hot':'')+'"><div class="n">'+n+'</div><div class="l">'+label+'</div>'+(sub?'<div class="s2">'+sub+'</div>':'')+'</div>';
+}
+async function loadOverview(){
+  const [pl, ss] = await Promise.all([
+    api('/rest/v1/plates?select=id,label,fleet_id,active'),
+    api('/rest/v1/plate_sessions?select=id,plate_id,fleet_id,driver_id,started_at&ended_at=is.null&order=started_at.desc')
+  ]);
+  _platesAll = (pl.ok && Array.isArray(pl.data)) ? pl.data : [];
+  _activeNow = (ss.ok && Array.isArray(ss.data)) ? ss.data : [];
+  /* rafraîchir les panneaux « Détails » déjà ouverts avec les données fraîches */
+  document.querySelectorAll('[data-fpanel]:not(.hidden)').forEach(panel=>{ panel.innerHTML=renderFleetDetail(panel.getAttribute('data-fpanel')); });
+  const fleets=_fleetsCache||[], accts=_accts||[];
+  const nFleet=fleets.length, nSusp=fleets.filter(f=>f.suspended).length;
+  const nPatron=accts.filter(a=>a.role==='patron').length;
+  const nChauf=accts.filter(a=>a.role==='chauffeur').length;
+  const nInactive=accts.filter(a=>!a.active).length;
+  const nPlate = pl.ok ? _platesAll.length : '—';
+  const nLive  = ss.ok ? _activeNow.length : '—';
+  $('kpis').innerHTML =
+    kpiTile(nLive, 'En service', 'maintenant', ss.ok && _activeNow.length>0) +
+    kpiTile(nFleet, 'Flottes', nSusp? nSusp+' suspendue'+(nSusp>1?'s':'') : (nFleet?'toutes actives':'')) +
+    kpiTile(nPatron, 'Patrons') +
+    kpiTile(nChauf, 'Chauffeurs') +
+    kpiTile(nPlate, 'Plaques') +
+    kpiTile(nInactive, 'Comptes inactifs');
+  /* liste « en service maintenant » */
+  const box=$('ovLive');
+  if(!ss.ok){ box.innerHTML = ss.status===404 ? '<div class="empty">Schéma plaques/GPS pas encore installé (Étapes 2-3).</div>' : ''; return; }
+  if(!_activeNow.length){ box.innerHTML='<h3>En service maintenant</h3><div class="empty">Personne ne conduit actuellement.</div>'; return; }
+  box.innerHTML='<h3>En service maintenant ('+_activeNow.length+')</h3>'+_activeNow.map(s=>{
+    const pl2=_platesAll.find(p=>p.id===s.plate_id);
+    const drv=(_accts||[]).find(a=>a.id===s.driver_id);
+    return '<div class="live-item"><span class="pulse"></span>'+
+      '<span class="plate">'+esc(pl2?pl2.label:'?')+'</span>'+
+      '<span class="muted">'+esc(drv?(drv.display_name||drv.username):'chauffeur')+'</span>'+
+      '<span class="fl">'+esc(fleetName(s.fleet_id)||'—')+' · depuis '+fmtHM(s.started_at)+'</span></div>';
+  }).join('');
+}
+$('ovRefresh').addEventListener('click', ()=>{ $('kpis').innerHTML='<div class="empty">Actualisation…</div>'; Promise.all([loadFleets(), loadAccounts()]).then(loadOverview); });
+function renderFleetDetail(id){
+  const patron=(_accts||[]).find(a=>a.role==='patron'&&a.fleet_id===id);
+  const chauf=(_accts||[]).filter(a=>a.role==='chauffeur'&&a.fleet_id===id);
+  const plates=_platesAll.filter(p=>p.fleet_id===id);
+  const active=_activeNow.filter(s=>s.fleet_id===id);
+  const activeSet=new Set(active.map(s=>s.plate_id));
+  const chaufChips = chauf.length ? chauf.map(c=>'<span class="chip">'+esc(c.display_name||c.username)+(c.active?'':' · inactif')+'</span>').join('') : '<span class="muted">aucun</span>';
+  const plateChips = plates.length ? plates.map(p=>'<span class="chip'+(activeSet.has(p.id)?' on':'')+'">'+esc(p.label)+(activeSet.has(p.id)?' •':'')+'</span>').join('') : '<span class="muted">aucune</span>';
+  return '<div class="drow"><span class="k">Patron</span><span>'+(patron?esc(patron.display_name||patron.username)+' <span class="muted">('+esc(patron.username)+')</span>':'<span class="muted">non défini</span>')+'</span></div>'+
+    '<div class="drow"><span class="k">Chauffeurs ('+chauf.length+')</span><span class="chips">'+chaufChips+'</span></div>'+
+    '<div class="drow"><span class="k">Plaques ('+plates.length+')</span><span class="chips">'+plateChips+'</span></div>'+
+    '<div class="drow"><span class="k">En service</span><span>'+(active.length?('<b style="color:var(--ok)">'+active.length+' maintenant</b>'):'<span class="muted">personne</span>')+'</span></div>';
+}
 
 /* ---- comptes ---- */
 let _accts=[];
@@ -562,15 +665,20 @@ function currentMapFleet(){
 }
 function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
 async function loadLive(){
-  const fid=currentMapFleet(); if(!fid || !_map) return;
+  if(!_map) return;
+  const fid=currentMapFleet();
+  const isAll = IS_ADMIN_APP && !fid;   /* super-admin : toutes les flottes */
+  if(!fid && !isAll) return;
   const since=new Date(Date.now()-10*60000).toISOString();
-  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
+  const filter = isAll ? '' : '&fleet_id=eq.'+fid;
+  const r=await api('/rest/v1/positions?select=plate_id,fleet_id,lat,lng,recorded_at,plates(label),profiles(username,display_name)&recorded_at=gte.'+since+filter+'&order=recorded_at.desc&limit=2000');
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
   _liveLayer.clearLayers(); const pts=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
     const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
-    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+'<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+'</span>'));
+    const flLine = isAll ? '<br><span style="color:#888">'+esc(fleetName(p.fleet_id)||'')+'</span>' : '';
+    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+flLine+'<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+'</span>'));
     pts.push([p.lat,p.lng]);
   });
   $('mapStatus').textContent = pts.length ? (pts.length+' plaque'+(pts.length>1?'s':'')+' en service') : 'Aucune plaque en service';
@@ -592,19 +700,33 @@ async function loadReplay(plateId){
 }
 async function fillReplayPlates(){
   const fid=currentMapFleet(), sel=$('mapReplay');
-  if(!fid){ sel.innerHTML='<option value="">—</option>'; return; }
-  const r=await api('/rest/v1/plates?select=id,label&fleet_id=eq.'+fid+'&order=label.asc');
+  const isAll = IS_ADMIN_APP && !fid;
+  if(!fid && !isAll){ sel.innerHTML='<option value="">—</option>'; return; }
+  const filter = isAll ? '' : '&fleet_id=eq.'+fid;
+  const r=await api('/rest/v1/plates?select=id,label,fleet_id&order=label.asc'+filter);
   sel.innerHTML='<option value="">— Trajet du jour : choisir une plaque —</option>'+
-    ((r.ok&&r.data)?r.data:[]).map(p=>'<option value="'+p.id+'">'+esc(p.label)+'</option>').join('');
+    ((r.ok&&r.data)?r.data:[]).map(p=>'<option value="'+p.id+'">'+esc(p.label)+(isAll?' · '+esc(fleetName(p.fleet_id)):'')+'</option>').join('');
 }
 function setupMapCard(){
-  const myFleet=_fleetsCache.find(f=>f.id===session.profile.fleet_id)||null;
-  const show = !IS_ADMIN_APP && myFleet && !myFleet.suspended && (myFleet.opt_gps_live||myFleet.opt_replay);
+  let show;
+  if(IS_ADMIN_APP){
+    /* super-admin : carte globale, toutes les flottes (ou une seule au choix) */
+    show = (_fleetsCache||[]).length>0;
+    if(show){
+      const prev=$('mapFleet').value;   /* garder le choix courant lors d'un re-render */
+      $('mapFleet').innerHTML='<option value="">Toutes les flottes</option>'+_fleetsCache.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('');
+      if(prev && _fleetsCache.some(f=>f.id===prev)) $('mapFleet').value=prev;
+      $('mapFleet').classList.remove('hidden');
+    }
+  } else {
+    const myFleet=_fleetsCache.find(f=>f.id===session.profile.fleet_id)||null;
+    show = myFleet && !myFleet.suspended && (myFleet.opt_gps_live||myFleet.opt_replay);
+  }
   $('mapCard').classList.toggle('hidden', !show);
   stopPoll();
   if(!show) return;
   if(!ensureMap()){ $('mapStatus').textContent='Carte indisponible (Leaflet non chargé).'; return; }
-  $('mapFleet').classList.add('hidden');
+  if(!IS_ADMIN_APP) $('mapFleet').classList.add('hidden');
   setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
   fillReplayPlates(); loadLive();
   _pollTimer=setInterval(loadLive, 8000);
