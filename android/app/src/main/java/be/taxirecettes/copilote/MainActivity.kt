@@ -51,21 +51,25 @@ class MainActivity : AppCompatActivity() {
                 callback?.invoke(origin, true, false)
             }
         }
-        web.loadUrl("file:///android_asset/webapp/index.html")
+        web.loadUrl(BuildConfig.LAUNCH_URL)
 
-        val need = ArrayList<String>()
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            need.add(Manifest.permission.POST_NOTIFICATIONS)
+        // Les permissions (notifications + GPS) ne concernent que l'app chauffeur
+        // (taximètre). Patron / Admin sont de simples tableaux de bord web.
+        if (BuildConfig.IS_DRIVER) {
+            val need = ArrayList<String>()
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                need.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                need.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            if (need.isNotEmpty()) requestPermissions(need.toTypedArray(), 101)
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            need.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        if (need.isNotEmpty()) requestPermissions(need.toTypedArray(), 101)
     }
 
     @Deprecated("Deprecated in Java")

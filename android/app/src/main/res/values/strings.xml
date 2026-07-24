@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">Taxi Recettes</string>
     <string name="copilote_title">Copilote</string>
     <string name="log_title">Journal (mouchard)</string>
     <string name="accessibility_label">Copilote Taxi — lecture des courses</string>

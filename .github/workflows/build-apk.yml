@@ -36,23 +36,38 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Construire l'APK (debug)
+      - name: Construire les 3 APK (debug)
         working-directory: android
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Préparer l'APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk taxi-copilote.apk
+      - name: Préparer les APK
+        run: |
+          cp android/app/build/outputs/apk/chauffeur/debug/app-chauffeur-debug.apk   taxi-chauffeur.apk
+          cp android/app/build/outputs/apk/patron/debug/app-patron-debug.apk         taxi-patron.apk
+          cp android/app/build/outputs/apk/superadmin/debug/app-superadmin-debug.apk taxi-admin.apk
+          ls -lh taxi-*.apk
 
-      - name: Artefact
+      - name: Artefacts
         uses: actions/upload-artifact@v4
         with:
-          name: taxi-copilote-apk
-          path: taxi-copilote.apk
+          name: taxi-apks
+          path: |
+            taxi-chauffeur.apk
+            taxi-patron.apk
+            taxi-admin.apk
 
       - name: Publier la release (téléchargeable sur le téléphone)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
-          name: Taxi Copilote — dernier APK
-          body: "APK de test, reconstruit automatiquement à chaque mise à jour. À installer sur le Xiaomi (autoriser les sources inconnues)."
-          files: taxi-copilote.apk
+          name: Taxi — 3 APK (chauffeur, patron, admin)
+          body: |
+            3 apps installables côte à côte sur Android (autoriser « sources inconnues ») :
+            • **taxi-chauffeur.apk** — carnet + taximètre (hors-ligne)
+            • **taxi-patron.apk** — ta flotte : plaques, carte GPS, réglages, chauffeurs
+            • **taxi-admin.apk** — super-admin : vue d'ensemble, carte globale, comptes
+            Reconstruites automatiquement à chaque mise à jour.
+          files: |
+            taxi-chauffeur.apk
+            taxi-patron.apk
+            taxi-admin.apk
