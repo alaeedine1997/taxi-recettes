@@ -79,6 +79,8 @@
   .empty{color:var(--muted);font-size:14px;padding:14px 4px}
   .muted{color:var(--muted)}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+  .acct{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:10px;background:var(--bg)}
+  .acct-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   #map{height:380px;border-radius:12px;margin-top:12px;z-index:0}
   #mapReplay{max-width:260px}
   .leaflet-container{font-family:var(--sans)}
@@ -394,16 +396,84 @@ $('nfAdd').addEventListener('click', async ()=>{
 });
 
 /* ---- comptes ---- */
+let _accts=[];
+function fleetName(id){ const f=_fleetsCache.find(x=>x.id===id); return f?f.name:''; }
 async function loadAccounts(){
-  const r=await api('/rest/v1/profiles?select=username,role,fleet_id&order=role.asc');
+  const r=await api('/rest/v1/profiles?select=id,username,display_name,role,fleet_id,active&order=role.asc');
   const el=$('accountsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les comptes.</div>'; return; }
-  const rows=r.data||[];
-  if(!rows.length){ el.innerHTML='<div class="empty">Aucun compte.</div>'; return; }
-  el.innerHTML='<table><thead><tr><th>Identifiant</th><th>Rôle</th></tr></thead><tbody>'+
-    rows.map(p=>'<tr><td>'+esc(p.username)+'</td><td><span class="rolechip '+esc(p.role)+'">'+roleLabel(p.role)+'</span></td></tr>').join('')+
-    '</tbody></table>';
+  _accts=r.data||[];
+  if(!_accts.length){ el.innerHTML='<div class="empty">Aucun compte.</div>'; return; }
+  el.innerHTML=_accts.map(p=>{
+    const fn=fleetName(p.fleet_id);
+    return '<div class="acct">'+
+      '<div class="acct-row">'+
+        '<div><b>'+esc(p.display_name||p.username)+'</b> <span class="muted">('+esc(p.username)+')</span>'+(p.active?'':' <span class="pill off">inactif</span>')+
+          '<div class="muted" style="font-size:12.5px"><span class="rolechip '+esc(p.role)+'">'+roleLabel(p.role)+'</span>'+(fn?' · '+esc(fn):'')+'</div></div>'+
+        '<div style="white-space:nowrap"><button class="btn sm ghost" data-edit="'+p.id+'">Modifier</button> <button class="btn sm ghost" data-del="'+p.id+'" style="color:var(--danger)">Supprimer</button></div>'+
+      '</div>'+
+      '<div class="hidden" data-editpanel="'+p.id+'" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"></div>'+
+    '</div>';
+  }).join('');
 }
+function renderEditPanel(id){
+  const p=_accts.find(x=>x.id===id); if(!p) return '';
+  const isSuper=p.role==='superadmin';
+  const fopts='<option value="">— aucune —</option>'+_fleetsCache.map(f=>'<option value="'+f.id+'"'+(f.id===p.fleet_id?' selected':'')+'>'+esc(f.name)+'</option>').join('');
+  const ropts=['chauffeur','patron','superadmin'].map(r=>'<option value="'+r+'"'+(r===p.role?' selected':'')+'>'+roleLabel(r)+'</option>').join('');
+  return '<div class="row c2">'+
+      '<div><label>Nom affiché</label><input data-en="'+id+'" value="'+esc(p.display_name||'')+'"></div>'+
+      '<div><label>Rôle</label><select data-er="'+id+'"'+(isSuper?' disabled':'')+'>'+ropts+'</select></div>'+
+    '</div>'+
+    '<div class="row c2" style="margin-top:10px">'+
+      '<div><label>Flotte</label><select data-ef="'+id+'">'+fopts+'</select></div>'+
+      '<div><label>Statut</label><select data-ea="'+id+'"><option value="1"'+(p.active?' selected':'')+'>Actif</option><option value="0"'+(p.active?'':' selected')+'>Désactivé</option></select></div>'+
+    '</div>'+
+    '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn primary sm" data-save="'+id+'">Enregistrer</button>'+
+      '<button class="btn sm" data-pw="'+id+'">Réinitialiser le mot de passe</button>'+
+    '</div>'+
+    '<div class="err" data-aerr="'+id+'"></div>';
+}
+async function callFn(payload){
+  try{
+    await ensureFresh();
+    const r=await fetch(SB_URL+'/functions/v1/rapid-function',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify(payload)});
+    let d=null; try{ d=await r.json(); }catch(_){}
+    if(r.ok && d && d.ok) return {ok:true};
+    const map={forbidden:'non autorisé',self_delete:'tu ne peux pas te supprimer toi-même',introuvable:'compte introuvable',mdp_court:'mot de passe trop court',identifiant_pris:'identifiant déjà pris'};
+    return {ok:false, err:(r.status===404?'fonction non déployée':((d&&map[d.error])||(d&&d.error)||('erreur '+r.status)))};
+  }catch(_){ return {ok:false, err:'réseau'}; }
+}
+$('accountsList').addEventListener('click', async e=>{
+  const ed=e.target.closest('[data-edit]');
+  if(ed){ const panel=document.querySelector('[data-editpanel="'+ed.dataset.edit+'"]');
+    if(panel.classList.contains('hidden')){ panel.innerHTML=renderEditPanel(ed.dataset.edit); panel.classList.remove('hidden'); } else panel.classList.add('hidden');
+    return; }
+  const del=e.target.closest('[data-del]');
+  if(del){ const p=_accts.find(x=>x.id===del.dataset.del);
+    if(!confirm('Supprimer définitivement le compte « '+(p?p.username:'')+' » ? Irréversible.')) return;
+    del.disabled=true; const r=await callFn({action:'delete', id:del.dataset.del}); del.disabled=false;
+    if(r.ok){ toast('Compte supprimé'); loadAccounts(); } else toast('Échec : '+r.err);
+    return; }
+  const sv=e.target.closest('[data-save]');
+  if(sv){ const id=sv.dataset.save, errEl=document.querySelector('[data-aerr="'+id+'"]'); errEl.textContent='';
+    const patch={ display_name:document.querySelector('[data-en="'+id+'"]').value.trim(),
+      role:document.querySelector('[data-er="'+id+'"]').value,
+      fleet_id:document.querySelector('[data-ef="'+id+'"]').value||null,
+      active:document.querySelector('[data-ea="'+id+'"]').value==='1' };
+    sv.disabled=true;
+    const r=await api('/rest/v1/profiles?id=eq.'+id,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(patch)});
+    sv.disabled=false;
+    if(r.ok){ toast('Compte modifié'); loadAccounts(); } else errEl.textContent=(r.status===401||r.status===403)?'Non autorisé.':'Échec de la modification.';
+    return; }
+  const pw=e.target.closest('[data-pw]');
+  if(pw){ const np=prompt('Nouveau mot de passe (6 caractères minimum) :'); if(np===null) return;
+    if((np||'').length<6){ toast('Mot de passe trop court'); return; }
+    pw.disabled=true; const r=await callFn({action:'password', id:pw.dataset.pw, password:np}); pw.disabled=false;
+    toast(r.ok?'Mot de passe réinitialisé':('Échec : '+r.err));
+    return; }
+});
 
 /* ---- plaques (Étape 2) ---- */
 function fmtHM(iso){ try{ const d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(_){ return ''; } }
