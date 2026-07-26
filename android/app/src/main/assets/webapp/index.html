@@ -1313,7 +1313,10 @@ $('reopenBtn').addEventListener('click', async ()=>{
   try{
     /* Rouvrir = reprendre le service : même verrou que l'ouverture.
        (Corriger une journée PASSÉE reste possible sans plaque.) */
-    if(date===todayKey() && !(await ensurePlate({date, km:null, reopen:true}))) return;
+    /* « hier » compte comme du travail : après minuit, un chauffeur de nuit
+       rouvrirait sa feuille d'hier et roulerait sans plaque. Au-delà, c'est
+       de la correction d'un ancien jour : autorisée sans plaque. */
+    if((date===todayKey() || date===yesterdayKey()) && !(await ensurePlate({date, km:null, reopen:true}))) return;
     doOpenDay(null, date, true);
   } finally{ b.disabled=false; }
 });
@@ -2444,21 +2447,39 @@ const plates = (function(){
     return {ok:false};
   }
   /* Rendu différé : sans réseau au moment de la clôture, la plaque resterait
-     bloquée pour TOUTE la flotte. On mémorise et on réessaie automatiquement. */
-  function setPending(sid){ try{ localStorage.setItem(PLATE_PENDING, sid); }catch(_){ } }
+     bloquée pour TOUTE la flotte. On mémorise et on réessaie automatiquement.
+     On garde le userId : la session n'est rendable que par son propriétaire
+     (RLS), et un collègue peut utiliser le même téléphone. */
+  function setPending(sid){ try{ localStorage.setItem(PLATE_PENDING, JSON.stringify({sid, uid:auth.userId()||null})); }catch(_){ } }
   function clearPending(){ try{ localStorage.removeItem(PLATE_PENDING); }catch(_){ } }
-  function hasPending(){ try{ return !!localStorage.getItem(PLATE_PENDING); }catch(_){ return false; } }
+  function getPending(){
+    let raw=null; try{ raw=localStorage.getItem(PLATE_PENDING); }catch(_){ }
+    if(!raw) return null;
+    try{ const o=JSON.parse(raw); return (o&&o.sid) ? o : null; }catch(_){ return {sid:raw, uid:null}; }
+  }
+  function hasPending(){ return !!getPending(); }
   async function retryPendingRelease(){
-    let sid=null; try{ sid=localStorage.getItem(PLATE_PENDING); }catch(_){ }
-    if(!sid || !navigator.onLine) return false;
-    const r=await endSession(sid);
-    if(r.ok){ clearPending(); if(cache && cache.sessionId===sid){ cache=null; save(); } return true; }
+    const p=getPending();
+    if(!p || !navigator.onLine) return false;
+    if(p.uid && auth.userId() && p.uid!==auth.userId()) return false;   /* pas mon rendu : un autre compte sur ce téléphone */
+    if(!auth.isLogged()) return false;
+    const r=await endSession(p.sid);
+    if(r.ok){ clearPending(); if(cache && cache.sessionId===p.sid){ cache=null; save(); } return true; }
     return false;
   }
   /* Toujours dans cet ordre : on rend d'abord ce qui traîne, PUIS on relit l'état
-     serveur (sinon refreshActive restaurerait la plaque qu'on veut rendre). */
-  async function resync(){ await retryPendingRelease(); return refreshActive(); }
-  function clearLocal(){ cache=null; save(); clearPending(); }
+     serveur (sinon refreshActive restaurerait la plaque qu'on veut rendre).
+     Dédoublonné : deux resync concurrents pouvaient « ressusciter » la plaque. */
+  let syncing=null;
+  function resync(){
+    if(syncing) return syncing;
+    syncing=(async()=>{ await retryPendingRelease(); await refreshActive(); })().finally(()=>{ syncing=null; });
+    return syncing;
+  }
+  /* NB : on ne purge PAS le rendu en attente ici — sessionEnded() est aussi
+     déclenché par un token expiré (fréquent quand le réseau est mauvais,
+     c'est-à-dire justement quand un rendu attend). Il sera rejoué au retour. */
+  function clearLocal(){ cache=null; save(); }
   return { active, required, listPlates, refreshActive, take, release, clearLocal, retryPendingRelease, hasPending, resync };
 })();
 
@@ -2529,7 +2550,7 @@ $('ppList').addEventListener('click', e=>{
       if(intent) doOpenDay(intent.km, intent.date, intent.reopen);   /* venait de « Ouvrir / Rouvrir la journée » */
       ensureGeoThenStart();
     }
-    else if(r.mine){ err.textContent='Tu détiens déjà une plaque — rends-la avant d\'en prendre une autre.'; plates.refreshActive().then(()=>{ renderPlate(); closePlatePicker(); }); }
+    else if(r.mine){ err.textContent='Tu détiens déjà une plaque — rends-la avant d\'en prendre une autre.'; plates.resync().then(()=>{ renderPlate(); closePlatePicker(); }); }   /* resync, sinon on ressusciterait une plaque en attente de rendu */
     else if(r.taken) err.textContent='Cette plaque est déjà prise par un autre chauffeur.';
     else if(r.net) err.textContent='Pas de connexion — réessaie.';
     else err.textContent='Cette plaque n\'est plus disponible.';

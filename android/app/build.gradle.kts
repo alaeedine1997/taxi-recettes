@@ -11,8 +11,8 @@ android {
         applicationId = "be.taxirecettes.copilote"
         minSdk = 26
         targetSdk = 34
-        versionCode = 29
-        versionName = "0.29"
+        versionCode = 30
+        versionName = "0.30"
     }
 
     // 3 variantes = 3 apps installables côte à côte
