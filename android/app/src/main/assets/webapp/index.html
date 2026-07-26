@@ -2210,7 +2210,10 @@ const carnet = (function(){
     pushTimer=setTimeout(push, 1500);
   }
   async function fetchServer(){
-    const r=await sbAuthed('/rest/v1/carnets?select=data,updated_at&limit=1');
+    /* Toujours filtrer sur MON id : depuis que le patron peut lire les carnets de ses
+       chauffeurs (Étape 5), un simple limit=1 pourrait renvoyer la ligne d'un autre. */
+    const uid=auth.userId(); if(!uid) return {net:false};
+    const r=await sbAuthed('/rest/v1/carnets?select=data,updated_at&user_id=eq.'+encodeURIComponent(uid)+'&limit=1');
     if(!r.ok) return {net:false};
     return {net:true, row: Array.isArray(r.data)&&r.data.length ? r.data[0] : null};
   }
@@ -2271,6 +2274,9 @@ const carnet = (function(){
   /* CLAIM : appelé à la connexion. Gère le changement d'identité sur un appareil partagé, sans JAMAIS perdre de données.
      Règle d'or : on interroge le serveur AVANT de toucher au carnet local. Hors-ligne, on ne détruit rien. */
   async function claim(userId){
+    /* Le carnet n'appartient qu'au chauffeur. Un patron / super-admin qui ouvrirait
+       cette app ne doit RIEN adopter ni pousser (il a son espace web dédié). */
+    if(auth.role() && auth.role()!=='chauffeur') return;
     const m=meta();
     if((m.ownerId||null)===userId){ await pull(); return; }
     const wasSolo=!m.ownerId;

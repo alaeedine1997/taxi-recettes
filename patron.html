@@ -85,6 +85,24 @@
   .note{font-size:13px;color:var(--muted);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:11px 13px}
   .err{color:var(--danger);font-size:13.5px;margin-top:8px;min-height:1px}
 
+  /* calcul de recette */
+  .csec{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+  .csec h3{font-family:var(--serif);font-weight:600;font-size:17px;margin:0 0 10px}
+  .chelp{font-size:12.5px;color:var(--muted);margin:6px 0 0;line-height:1.4}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(124px,1fr));gap:9px}
+  .cbox{border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:var(--bg)}
+  .cbox .v{font-family:var(--serif);font-weight:600;font-size:20px;font-variant-numeric:tabular-nums}
+  .cbox .k{font-size:12px;color:var(--muted);margin-top:3px;font-weight:600}
+  table.led{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;min-width:340px}
+  table.led th,table.led td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right}
+  table.led th:first-child,table.led td:first-child{text-align:left;font-weight:500}
+  table.led thead th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  table.led tr.tot td{font-weight:700;font-size:16px;border-top:2px solid var(--line);border-bottom:none;padding-top:12px}
+  table.led td.neg{color:var(--danger)}
+  .settle{margin-top:14px;border-radius:12px;padding:14px 16px;background:rgba(79,122,67,.10);border:1px solid rgba(79,122,67,.4)}
+  .settle.owe{background:rgba(166,121,31,.12);border-color:rgba(166,121,31,.45)}
+  .settle .big{font-family:var(--serif);font-weight:600;font-size:22px;margin-top:3px}
+
   /* login */
   #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
   .loginbox{width:100%;max-width:380px;text-align:center}
@@ -158,6 +176,72 @@
       </div>
       <div class="err" id="npErr"></div>
       <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
+    </div>
+
+    <!-- Calcul de recette sur une période -->
+    <div class="card" id="calcCard">
+      <h2>Calcul de recette</h2>
+      <p class="hint">Choisis un chauffeur et une période (une semaine, un mois, deux mois…). La recette est construite à partir de ce qu'il a noté dans son carnet.</p>
+      <div class="row c2">
+        <div><label for="cChauf">Chauffeur</label><select id="cChauf"><option value="">— chargement —</option></select></div>
+        <div><label for="cPreset">Période</label><select id="cPreset">
+          <option value="thisweek">Cette semaine</option>
+          <option value="thismonth" selected>Ce mois-ci</option>
+          <option value="lastmonth">Le mois dernier</option>
+          <option value="2months">Les 2 derniers mois</option>
+          <option value="custom">Dates au choix…</option>
+        </select></div>
+      </div>
+      <div class="row c2" style="margin-top:10px">
+        <div><label for="cFrom">Du</label><input type="date" id="cFrom"></div>
+        <div><label for="cTo">Au</label><input type="date" id="cTo"></div>
+      </div>
+      <button class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Charger la fiche</button>
+      <div class="err" id="cErr"></div>
+
+      <div id="cSheet" class="hidden">
+        <!-- fiche de recette du chauffeur -->
+        <div class="csec">
+          <h3>Fiche du chauffeur <span class="muted" id="cSheetWho"></span></h3>
+          <div class="cgrid" id="cSheetKpis"></div>
+          <p class="chelp" id="cKmNote"></p>
+          <button class="btn sm ghost" id="cDetailBtn" style="margin-top:10px">Voir le détail par jour ▾</button>
+          <div id="cDetail" class="hidden" style="margin-top:10px;overflow-x:auto"></div>
+        </div>
+
+        <!-- réglages du partage -->
+        <div class="csec">
+          <h3>Réglages du partage</h3>
+          <div class="row c2">
+            <div><label for="cPct">Part du patron (%)</label><input type="number" id="cPct" min="0" max="100" step="1" value="40"></div>
+            <div><label for="cPctD">Part du chauffeur (%)</label><input type="number" id="cPctD" min="0" max="100" step="1" value="60"></div>
+          </div>
+          <div class="row c2" style="margin-top:10px">
+            <div><label for="cTip">Pourboire du chauffeur (€)</label><input type="text" inputmode="decimal" id="cTip" value="0"></div>
+            <div><label for="cFuelKm">Carburant € / km</label><input type="text" inputmode="decimal" id="cFuelKm" value="0"></div>
+          </div>
+          <p class="chelp">Le pourboire est déjà compris dans la recette : il est rendu <strong>en entier</strong> au chauffeur.</p>
+          <div style="margin-top:10px"><label for="cFuelWho">Le carburant est à la charge de</label><select id="cFuelWho">
+            <option value="share" selected>Les deux — partagé selon le %</option>
+            <option value="chauffeur">Le chauffeur seul</option>
+            <option value="patron">Le patron seul</option>
+          </select></div>
+          <div class="row c2" style="margin-top:10px">
+            <div><label for="cChP">Charge en faveur du patron (€)</label><input type="text" inputmode="decimal" id="cChP" value="0">
+              <p class="chelp">Le patron a payé pour le chauffeur → le chauffeur lui rembourse.</p></div>
+            <div><label for="cChC">Charge en faveur du chauffeur (€)</label><input type="text" inputmode="decimal" id="cChC" value="0">
+              <p class="chelp">Le chauffeur a payé pour le patron → le patron lui rembourse.</p>
+              <button class="btn sm ghost hidden" id="cChCFill">Reporter ses charges notées</button></div>
+          </div>
+          <div style="margin-top:10px"><label for="cKeepCash">Le chauffeur garde le cash ?</label><select id="cKeepCash">
+            <option value="1" selected>Oui — il garde le cash encaissé</option>
+            <option value="0">Non — il remet tout le cash au patron</option>
+          </select></div>
+        </div>
+
+        <!-- résultat -->
+        <div class="csec" id="cResult"></div>
+      </div>
     </div>
 
     <!-- Réglages de flotte : sources + carburant -->
@@ -305,6 +389,7 @@ function showApp(){
     : 'Options débloquées par l\'administrateur (lecture seule).';
   loadFleets(); loadAccounts();
   if(!isAdmin) loadPlates();
+  applyPreset();   /* période par défaut = ce mois-ci */
 }
 
 /* ---- flottes ---- */
@@ -359,14 +444,17 @@ $('nfAdd').addEventListener('click', async ()=>{
 });
 
 /* ---- comptes ---- */
+let _accts=[];
 async function loadAccounts(){
-  const r=await api('/rest/v1/profiles?select=username,role,fleet_id&order=role.asc');
+  const r=await api('/rest/v1/profiles?select=id,username,display_name,role,fleet_id,active&order=role.asc');
   const el=$('accountsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les comptes.</div>'; return; }
-  const rows=r.data||[];
-  if(!rows.length){ el.innerHTML='<div class="empty">Aucun compte.</div>'; return; }
-  el.innerHTML='<table><thead><tr><th>Identifiant</th><th>Rôle</th></tr></thead><tbody>'+
-    rows.map(p=>'<tr><td>'+esc(p.username)+'</td><td><span class="rolechip '+esc(p.role)+'">'+roleLabel(p.role)+'</span></td></tr>').join('')+
+  _accts=r.data||[];
+  fillChaufList();
+  if(!_accts.length){ el.innerHTML='<div class="empty">Aucun compte.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Nom</th><th>Rôle</th></tr></thead><tbody>'+
+    _accts.map(p=>'<tr><td>'+esc(p.display_name||p.username)+' <span class="muted">('+esc(p.username)+')</span>'+(p.active?'':' <span class="pill off">inactif</span>')+
+      '</td><td><span class="rolechip '+esc(p.role)+'">'+roleLabel(p.role)+'</span></td></tr>').join('')+
     '</tbody></table>';
 }
 
@@ -536,6 +624,7 @@ async function loadCfg(){
   if(r.ok && Array.isArray(r.data) && r.data.length && Array.isArray(r.data[0].sources) && r.data[0].sources.length){
     _cfgSrc = r.data[0].sources.map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)||0,builtin:!!s.builtin,appCash:!!s.appCash}));
     $('cfgFuel').value = Number(r.data[0].fuel_per_km)||0;
+    if(!_sheet) $('cFuelKm').value = Number(r.data[0].fuel_per_km)||0;   /* pré-remplit le calcul de recette */
   } else if(r.status===404){ $('cfgSources').innerHTML='<div class="empty">Table fleet_config absente — lance le SQL de l\'Étape 4.</div>'; return; }
   else { _cfgSrc = DEF_SRC.slice(); $('cfgFuel').value=0; }   /* pas encore de config → défauts */
   renderCfgSources();
@@ -616,6 +705,192 @@ $('nuCreate').addEventListener('click', async ()=>{
       : (map[e]||('Erreur : '+(e||r.status)));
   }
 });
+
+/* ================= CALCUL DE RECETTE (Étape 5) =================
+   La fiche vient du carnet du chauffeur (lecture seule, RLS : sa flotte).
+   On reproduit EXACTEMENT la formule du net de l'app chauffeur. */
+let _sheet=null;
+const eur = n => (Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
+/* accepte la virgule décimale belge : « 0,25 » comme « 0.25 » */
+const num = id => { const v=Number(String($(id).value).replace(/[\s€]/g,'').replace(',','.')); return isFinite(v)&&v>0 ? v : 0; };
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+/* --- net d'une course : même règle que le carnet du chauffeur --- */
+function cSrcAppCash(db,id){ const s=(db.sources||[]).find(x=>x.id===id); return !!(s&&s.appCash); }
+function cRateOf(db,id){ const s=(db.sources||[]).find(x=>x.id===id); return s&&isFinite(Number(s.rate))?Number(s.rate):0; }
+function cRideNet(db,r){
+  if(r.pay==='appcash') return r.amt;
+  if(cSrcAppCash(db,r.src)) return r.amt;
+  if(r.pay==='app') return r.amt;
+  const rate = (typeof r.rate==='number' && isFinite(r.rate)) ? r.rate : cRateOf(db,r.src);
+  return Math.round(r.amt*(1-rate/100)*100)/100;
+}
+/* part encaissée en liquide (même convention que le carnet) */
+function cRideCash(db,r){
+  if(r.pay==='appcash') return Math.round((Number(r.cash)||0)*100)/100;
+  return r.pay==='cash' ? cRideNet(db,r) : 0;
+}
+
+/* --- périodes --- */
+function applyPreset(){
+  const p=$('cPreset').value; if(p==='custom') return;
+  const now=new Date(); let from,to;
+  if(p==='thisweek'){ const d=new Date(now); const dow=(d.getDay()+6)%7; /* lundi=0 */
+    from=new Date(d); from.setDate(d.getDate()-dow); to=new Date(from); to.setDate(from.getDate()+6); }
+  else if(p==='thismonth'){ from=new Date(now.getFullYear(),now.getMonth(),1); to=new Date(now.getFullYear(),now.getMonth()+1,0); }
+  else if(p==='lastmonth'){ from=new Date(now.getFullYear(),now.getMonth()-1,1); to=new Date(now.getFullYear(),now.getMonth(),0); }
+  else { from=new Date(now.getFullYear(),now.getMonth()-1,1); to=new Date(now.getFullYear(),now.getMonth()+1,0); }
+  $('cFrom').value=ymd(from); $('cTo').value=ymd(to);
+}
+$('cPreset').addEventListener('change', applyPreset);
+['cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{ $('cPreset').value='custom'; }));
+/* changer de chauffeur ou de période invalide la fiche affichée :
+   on ne doit JAMAIS montrer un règlement calculé pour quelqu'un d'autre */
+['cChauf','cPreset','cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{
+  _sheet=null; $('cSheet').classList.add('hidden'); $('cErr').textContent='';
+}));
+
+/* --- liste des chauffeurs de ma flotte --- */
+function fillChaufList(){
+  const list=(_accts||[]).filter(a=>a.role==='chauffeur');
+  $('cChauf').innerHTML = list.length
+    ? list.map(a=>'<option value="'+a.id+'">'+esc(a.display_name||a.username)+'</option>').join('')
+    : '<option value="">— aucun chauffeur —</option>';
+}
+
+/* --- charger la fiche depuis le carnet --- */
+async function loadSheet(){
+  const uid=$('cChauf').value, from=$('cFrom').value, to=$('cTo').value;
+  $('cErr').textContent=''; $('cSheet').classList.add('hidden');
+  if(!uid){ $('cErr').textContent='Choisis un chauffeur.'; return; }
+  if(!from||!to){ $('cErr').textContent='Choisis les deux dates.'; return; }
+  if(from>to){ $('cErr').textContent='La date « du » doit être avant la date « au ».'; return; }
+  const b=$('cLoad'); b.disabled=true; b.textContent='Chargement…';
+  const r=await api('/rest/v1/carnets?select=data,updated_at&user_id=eq.'+uid);
+  b.disabled=false; b.textContent='Charger la fiche';
+  if(!r.ok){
+    $('cErr').textContent = (r.status===401||r.status===403)
+      ? 'Accès refusé — lance le SQL de l\'Étape 5 (etape5-calcul-patron.sql).'
+      : (r.status===404 ? 'Table carnets absente sur le serveur.' : 'Chargement impossible.');
+    return;
+  }
+  if(!Array.isArray(r.data) || !r.data.length){
+    $('cErr').textContent='Ce chauffeur n\'a pas encore synchronisé son carnet (il doit se connecter dans son app).'; return;
+  }
+  const db=r.data[0].data||{}; const days=db.days||{};
+  /* prix du carburant : celui réglé dans le carnet, si le patron n'a rien saisi */
+  const fpk=Number(db.fuelPerKm);
+  if(isFinite(fpk) && fpk>0 && !num('cFuelKm')) $('cFuelKm').value=String(fpk).replace('.',',');
+  const R=x=>Math.round(x*100)/100;
+  let brut=0, net=0, cash=0, km=0, charges=0, nDays=0, kmMissing=0;
+  const rows=[];
+  Object.keys(days).filter(k=>k>=from && k<=to).sort().forEach(k=>{
+    const d=days[k]||{};
+    /* même filtre que le carnet : on ignore toute course mal formée */
+    const rides=(d.rides||[]).filter(x=>x&&typeof x==='object'&&isFinite(Number(x.amt))&&Number(x.amt)>0)
+                             .map(x=>Object.assign({},x,{amt:Number(x.amt)}));
+    const dCharges=(d.charges||[]).filter(c=>c&&isFinite(Number(c.amt))&&Number(c.amt)>0);
+    const worked = !!(d.openedAt||d.closedAt||rides.length||dCharges.length);
+    if(!worked) return;
+    const dBrut=R(rides.reduce((a,x)=>a+x.amt,0));
+    const dNet =R(rides.reduce((a,x)=>a+cRideNet(db,x),0));
+    const dCash=R(rides.reduce((a,x)=>a+cRideCash(db,x),0));
+    const dCh  =R(dCharges.reduce((a,c)=>a+Number(c.amt),0));
+    let dKm=null;
+    if(d.kmStart!=null && d.kmEnd!=null && d.kmEnd>=d.kmStart) dKm=d.kmEnd-d.kmStart; else kmMissing++;
+    nDays++; brut+=dBrut; net+=dNet; cash+=dCash; charges+=dCh; if(dKm) km+=dKm;
+    rows.push({k,dBrut,dNet,dCash,dCh,dKm,n:rides.length});
+  });
+  brut=R(brut); net=R(net); cash=R(cash); charges=R(charges);
+  _sheet={uid,from,to,brut,net,cash,km,charges,nDays,kmMissing,rows,
+          who:($('cChauf').selectedOptions[0]||{}).textContent||'',
+          synced:r.data[0].updated_at};
+  renderSheet();
+  $('cSheet').classList.remove('hidden');
+}
+
+function renderSheet(){
+  const s=_sheet;
+  $('cSheetWho').textContent = '· '+s.who+' · du '+s.from+' au '+s.to;
+  const comm=s.brut-s.net;
+  $('cSheetKpis').innerHTML=
+    '<div class="cbox"><div class="v">'+eur(s.net)+'</div><div class="k">Recette nette</div></div>'+
+    '<div class="cbox"><div class="v">'+eur(s.brut)+'</div><div class="k">Recette brute</div></div>'+
+    '<div class="cbox"><div class="v">'+eur(comm)+'</div><div class="k">Commissions</div></div>'+
+    '<div class="cbox"><div class="v">'+eur(s.cash)+'</div><div class="k">Cash encaissé</div></div>'+
+    '<div class="cbox"><div class="v">'+s.km+'</div><div class="k">Km parcourus</div></div>'+
+    '<div class="cbox"><div class="v">'+s.nDays+'</div><div class="k">Jours travaillés</div></div>'+
+    (s.charges>0?'<div class="cbox"><div class="v">'+eur(s.charges)+'</div><div class="k">Charges notées</div></div>':'');
+  $('cChCFill').classList.toggle('hidden', !(s.charges>0));
+  $('cKmNote').innerHTML = s.kmMissing
+    ? '⚠ '+s.kmMissing+' jour(s) travaillé(s) sans relevé de km complet — ces km ne sont pas comptés, donc le carburant est sous-estimé.'
+    : '';
+  $('cDetail').innerHTML='<table class="led"><thead><tr><th>Jour</th><th>Courses</th><th>Brut</th><th>Net</th><th>Cash</th><th>Km</th></tr></thead><tbody>'+
+    (s.rows.length?s.rows.map(r=>'<tr><td>'+r.k+'</td><td>'+r.n+'</td><td>'+eur(r.dBrut)+'</td><td>'+eur(r.dNet)+'</td><td>'+eur(r.dCash)+'</td><td>'+(r.dKm==null?'—':r.dKm)+'</td></tr>').join('')
+      :'<tr><td colspan="6" class="muted">Aucun jour travaillé sur la période.</td></tr>')+
+    '</tbody></table>';
+  compute();
+}
+
+/* --- le calcul --- */
+function compute(){
+  if(!_sheet) return;
+  const s=_sheet;
+  const R=x=>Math.round(x*100)/100;
+  const p=Math.min(100,Math.max(0,Number($('cPct').value)||0))/100;   /* part patron */
+  const tipRaw=num('cTip');
+  const P=R(Math.min(tipRaw, s.net));                                  /* pourboire (compris dans la recette) */
+  const F=R(s.km*num('cFuelKm'));                                      /* carburant */
+  const who=$('cFuelWho').value;
+  const CP=R(num('cChP')), CC=R(num('cChC'));
+
+  /* Chaque montant est arrondi UNE fois, et la part complémentaire est obtenue par
+     soustraction : les colonnes affichées tombent toujours juste au centime. */
+  const base=R(Math.max(0, s.net-P));
+  const shareP=R(base*p), shareC=R(base-shareP);                       /* shareP+shareC === base */
+  let fP=0, fC=0;
+  if(who==='share'){ fP=R(F*p); fC=R(F-fP); }                          /* fP+fC === F */
+  else if(who==='chauffeur'){ fC=F; } else { fP=F; }
+  const pat=R(shareP-fP+CP-CC);
+  const chf=R(shareC+P-fC+CC-CP);                                      /* le pourboire revient en entier au chauffeur */
+
+  const keeps=$('cKeepCash').value==='1';
+  const solde=R((keeps? s.cash : 0)-chf);                              /* >0 : le chauffeur doit au patron */
+
+  const cell=v=>'<td'+(v<0?' class="neg"':'')+'>'+(v?eur(v):'—')+'</td>';
+  $('cResult').innerHTML='<h3>Résultat</h3><div style="overflow-x:auto"><table class="led">'+
+    '<thead><tr><th>Ligne</th><th>Patron</th><th>Chauffeur</th></tr></thead><tbody>'+
+    '<tr><td>Recette à partager ('+eur(base)+')</td>'+cell(shareP)+cell(shareC)+'</tr>'+
+    (P>0?'<tr><td>Pourboire (rendu en entier)</td><td>—</td>'+cell(P)+'</tr>':'')+
+    (F>0?'<tr><td>Carburant ('+s.km+' km × '+$('cFuelKm').value+' €)</td>'+cell(-fP)+cell(-fC)+'</tr>':'')+
+    (CP>0?'<tr><td>Charge faveur patron — le chauffeur rembourse</td>'+cell(CP)+cell(-CP)+'</tr>':'')+
+    (CC>0?'<tr><td>Charge faveur chauffeur — le patron rembourse</td>'+cell(-CC)+cell(CC)+'</tr>':'')+
+    '<tr class="tot"><td>Net</td>'+cell(pat)+cell(chf)+'</tr>'+
+    '</tbody></table></div>'+
+    (tipRaw>s.net ? '<p class="chelp" style="color:var(--danger)">⚠ Le pourboire saisi ('+eur(tipRaw)+') dépasse la recette nette — ramené à '+eur(P)+'. Vérifie le montant.</p>' : '')+
+    '<div class="settle'+(solde>0?'':' owe')+'">'+
+      '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT'+(keeps?' — le chauffeur a gardé '+eur(s.cash)+' en cash':' — le chauffeur a tout remis')+'</div>'+
+      '<div class="big">'+(Math.abs(solde)<0.005
+        ? 'Compte soldé — personne ne doit rien.'
+        : (solde>0 ? 'Le chauffeur doit '+eur(solde)+' au patron'
+                   : 'Le patron doit '+eur(-solde)+' au chauffeur'))+'</div>'+
+    '</div>';
+}
+/* recalcul en direct */
+['cPct','cPctD','cTip','cFuelKm','cFuelWho','cChP','cChC','cKeepCash'].forEach(id=>{
+  $(id).addEventListener('input', e=>{
+    if(id==='cPct'){ const v=Math.min(100,Math.max(0,Number($('cPct').value)||0)); $('cPctD').value=Math.round((100-v)*100)/100; }
+    if(id==='cPctD'){ const v=Math.min(100,Math.max(0,Number($('cPctD').value)||0)); $('cPct').value=Math.round((100-v)*100)/100; }
+    compute();
+  });
+  $(id).addEventListener('change', compute);
+});
+$('cLoad').addEventListener('click', loadSheet);
+$('cDetailBtn').addEventListener('click', ()=>{
+  const d=$('cDetail'), open=d.classList.toggle('hidden');
+  $('cDetailBtn').textContent = open ? 'Voir le détail par jour ▾' : 'Masquer le détail ▴';
+});
+$('cChCFill').addEventListener('click', ()=>{ if(_sheet){ $('cChC').value=_sheet.charges.toFixed(2); compute(); } });
 
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{

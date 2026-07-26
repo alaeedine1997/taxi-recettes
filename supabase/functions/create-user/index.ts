@@ -85,7 +85,12 @@ Deno.serve(async (req) => {
     if (me.role === "superadmin") {
       /* peut agir sur tout le monde */
     } else if (me.role === "patron") {
-      if (target.role !== "chauffeur" || target.fleet_id !== me.fleet_id) return json({ error: "forbidden" }, 403);
+      // ATTENTION : sans ce garde, un patron sans flotte (fleet_id null) passerait
+      // le test suivant pour tout chauffeur SOLO (null !== null === false).
+      if (!me.fleet_id) return json({ error: "patron_sans_flotte" }, 403);
+      if (target.role !== "chauffeur" || !target.fleet_id || target.fleet_id !== me.fleet_id) {
+        return json({ error: "forbidden" }, 403);
+      }
     } else return json({ error: "forbidden" }, 403);
 
     if (action === "delete") {
