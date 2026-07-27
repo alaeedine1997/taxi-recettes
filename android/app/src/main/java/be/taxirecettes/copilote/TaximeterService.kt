@@ -107,6 +107,9 @@ class TaximeterService : Service() {
         } catch (_: Exception) {
         }
         try {
+            // libérer l'éventuel wakelock précédent : un double démarrage en laissait
+            // un orphelin tenu 4 h (batterie vidée en silence)
+            if (wakeLock?.isHeld == true) try { wakeLock?.release() } catch (_: Exception) {}
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "taxi:meter")
             wakeLock?.acquire(4 * 60 * 60 * 1000L)   // garde-fou 4 h max

@@ -95,9 +95,13 @@ Deno.serve(async (req) => {
 
     if (action === "delete") {
       if (targetId === caller.user.id) return json({ error: "self_delete" }, 400); // ne pas se supprimer soi-même
-      await admin.from("profiles").delete().eq("id", targetId);
-      const { error } = await admin.auth.admin.deleteUser(targetId);
-      if (error) return json({ error: "delete_failed", detail: error.message }, 400);
+      // On supprime le LOGIN d'abord : si on commençait par le profil et que cette
+      // étape échouait, il resterait un compte fantôme capable de se connecter et
+      // de lire son propre carnet, mais sans rôle ni rattachement.
+      const { error: aErr } = await admin.auth.admin.deleteUser(targetId);
+      if (aErr) { console.error("delete_failed", aErr.message); return json({ error: "delete_failed" }, 400); }
+      const { error: pErr } = await admin.from("profiles").delete().eq("id", targetId);
+      if (pErr) console.error("profil orphelin", targetId, pErr.message);   // filet si pas de cascade
       return json({ ok: true });
     }
 

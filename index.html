@@ -723,8 +723,13 @@ function normalizeDb(d){
               srcName: String(r.srcName||''),
               pay,
               amt: Math.round(Number(r.amt)*100)/100,
+              /* Si la course n'a pas encore de taux figé, on le fige MAINTENANT depuis sa
+                 source : sinon, le jour où cette source est supprimée, la retenue
+                 tomberait silencieusement à 0 % et le net serait surévalué. */
               rate: (pay==='appcash' || srcAppCash) ? 0
-                    : (isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate))) : undefined)
+                    : (isFinite(Number(r.rate)) ? Math.min(100,Math.max(0,Number(r.rate)))
+                       : (function(){ const s=out.sources.find(x=>x.id===src);
+                                      return (s && isFinite(Number(s.rate))) ? Math.min(100,Math.max(0,Number(s.rate))) : undefined; })())
             };
             if(pay==='appcash'){ const c=Number(r.cash); o.cash = (isFinite(c)&&c>=0) ? Math.round(c*100)/100 : 0; }
             return o;
@@ -839,12 +844,17 @@ function parseAmount(s){
     if(t.indexOf(',') !== t.lastIndexOf(',')) return NaN;   /* plusieurs virgules : ambigu */
     t = t.replace(/\./g,'').replace(',','.');               /* "1.234,56" -> "1234.56" */
   }
+  /* Points en séparateurs de MILLIERS, sans virgule : "1.000" = mille (et non 1,00 €).
+     Le motif exige des groupes de 3 chiffres, donc "12.5" ou "1.05" restent décimaux. */
+  else if(/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,'');
   if(!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return NaN;
   const v = parseFloat(t);
   return (isFinite(v) && v>0) ? Math.round(v*100)/100 : NaN;
 }
 function parseKm(s){
-  const t = String(s).replace(/\D/g,'');
+  /* On coupe d'abord une éventuelle décimale ("125480,7" -> "125480") : sinon elle
+     était collée aux unités et multipliait le kilométrage par 10. */
+  const t = String(s).trim().replace(/[.,]\d{1,2}$/,'').replace(/\D/g,'');
   return t==='' ? null : Math.min(99999999, Number(t));
 }
 function sourceOf(id){ return db.sources.find(s=>s.id===id); }
@@ -860,7 +870,10 @@ function rideNet(r){
   if(r.pay==='appcash') return r.amt;
   if(sourceIsAppCash(r.src)) return r.amt;
   if(r.pay==='app') return r.amt;
-  return Math.round(r.amt * (1 - rideRate(r)/100) * 100)/100;
+  /* Calcul en centimes entiers : en virgule flottante, les cas pile au demi-centime
+     (fréquents à 25/30/33 %) tombaient systématiquement du mauvais côté, toujours
+     en défaveur du chauffeur. */
+  return Math.round(Math.round(r.amt*100) * (10000 - Math.round(rideRate(r)*100)) / 10000)/100;
 }
 /* Répartit le net d'une course entre les 4 seaux d'encaissement.
    Une saisie appcash donne : cash = ce qui est pris en liquide, app = virement (total − cash, peut être négatif). */
@@ -893,13 +906,13 @@ function computeDay(d){
 function monthDays(mk){ return Object.keys(db.days).filter(k=>k.startsWith(mk+'-') && dayIsWorked(db.days[k])).sort(); }
 function computeMonth(mk){
   const keys = monthDays(mk);
-  let brut=0, net=0, charges=0, fuel=0, km=0, count=0;
+  let brut=0, net=0, charges=0, fuel=0, km=0, count=0, kmManquants=0;
   keys.forEach(k=>{
     const c = computeDay(db.days[k]);
     brut+=c.brut; net+=c.net; charges+=c.charges; fuel+=c.fuel; count+=c.count;
-    if(c.km) km+=c.km;
+    if(c.km) km+=c.km; else kmManquants++;   /* km absents ou incohérents : le carburant du mois est sous-estimé */
   });
-  return {brut, net, charges, fuel, km, count, days:keys.length, perKm: km>0 ? net/km : null, keys};
+  return {brut, net, charges, fuel, km, count, days:keys.length, perKm: km>0 ? net/km : null, kmManquants, keys};
 }
 function computeMonthBySource(mk){
   const map = new Map();
@@ -1108,6 +1121,10 @@ function renderHistory(){
   if(m.fuel>0) g += '<div class="stat wide"><div class="k">Carburant (estimé)</div><div class="v">− '+fmtEur(m.fuel)+'</div></div>';
   if(m.charges>0) g += '<div class="stat wide"><div class="k">Charges</div><div class="v">− '+fmtEur(m.charges)+'</div></div>';
   if(m.fuel>0 || m.charges>0) g += '<div class="stat wide"><div class="k">Net après frais</div><div class="v acc">'+fmtEur(m.net-m.charges-m.fuel)+'</div></div>';
+  /* Sans ce rappel, des km manquants faisaient croire à un carburant plus faible
+     — donc à un « net après frais » plus élevé que la réalité. */
+  if(m.kmManquants>0) g += '<div class="stat wide"><div class="k">⚠ Kilométrage incomplet</div><div class="v" style="font-size:15px;line-height:1.35">'+
+    m.kmManquants+' jour'+(m.kmManquants>1?'s':'')+' sans relevé km valable — le carburant du mois est sous-estimé.</div></div>';
   $('monthGrid').innerHTML = g;
 
   /* grands totaux d'encaissement (cash / facturé) — LA priorité de fin de mois */
@@ -1934,9 +1951,12 @@ const taxi = (function(){
      applyMin=true  : prix final — on applique le minimum de course (fin de course). */
   function priceNow(applyMin){
     const t=c();
-    let p = applyMin ? Math.max(total, t.minimumCourse) : total;
     const saut=t.sautCompteur>0?t.sautCompteur:0.10;
-    return Math.round(p/saut)*saut;
+    /* On arrondit AVANT d'appliquer le minimum : dans l'autre ordre, l'arrondi
+       pouvait faire redescendre le prix SOUS le minimum de course. */
+    let p = Math.round(total/saut)*saut;
+    if(applyMin) p = Math.max(p, t.minimumCourse);
+    return Math.round(p*100)/100;
   }
   /* le minimum a-t-il rehaussé le prix ? (pour l'info de fin de course) */
   function minApplique(){ const t=c(); return total < t.minimumCourse; }
@@ -2012,14 +2032,19 @@ const taxi = (function(){
   }
   function addToCarnet(){
     const price=lastFinal;
-    const d=getDay(state.date);
+    /* La course qu'on vient de rouler appartient à la journée EN COURS (ou à aujourd'hui),
+       jamais à la date qu'on est en train de consulter dans l'historique : sinon consulter
+       un ancien jour puis lancer le compteur créditait cet ancien jour et le rouvrait. */
+    const key = db.activeDay || todayKey();
+    if(state.date !== key){ state.date = key; try{ $('dateInput').value = key; }catch(_){ } }
+    const d=getDay(key);
     if(!d.openedAt && !d.closedAt){                                   /* journée jamais ouverte → l'ouvrir en ajoutant la course (sinon elle paraîtrait « Clôturée ») */
-      d.openedAt = state.date===todayKey()?nowHM():'';
+      d.openedAt = nowHM();
       /* en flotte, une journée ne devient « en cours » que si la plaque est prise */
-      if(!db.activeDay && !(plates.required() && !plates.active())) db.activeDay = state.date;
+      if(!db.activeDay && !(plates.required() && !plates.active())) db.activeDay = key;
     }
-    d.rides.push({id:'r'+Date.now()+Math.floor(Math.random()*1000), t: state.date===todayKey()?nowHM():'', src:addSrc, srcName:sourceName(addSrc), pay:addPay, amt:price, rate: addPay==='app'?0:rateOf(addSrc)});
-    const ok=saveDb(); renderDay();
+    d.rides.push({id:'r'+Date.now()+Math.floor(Math.random()*1000), t: nowHM(), src:addSrc, srcName:sourceName(addSrc), pay:addPay, amt:price, rate: addPay==='app'?0:rateOf(addSrc)});
+    const ok=saveDb(); renderDay(); renderHistory();
     if(ok) toast('Course ajoutée — '+fmtEur(price));
     reset();
   }
@@ -2602,7 +2627,7 @@ function ensureGeoThenStart(){
   const c=geo.consent();
   if(c==='no') return;                                                      /* refus respecté */
   if(c!=='yes'){
-    const ok=confirm('Partager ta position avec ton patron pendant le service ?\n\n• Visible par ton patron uniquement\n• Seulement quand tu as pris une plaque\n• S\'arrête dès que tu rends la plaque');
+    const ok=confirm('Partager ta position avec ton patron pendant le service ?\n\n• Visible par ton patron uniquement\n• Enregistrée seulement quand tu as pris une plaque\n• L\'enregistrement s\'arrête dès que tu rends la plaque\n• Le trajet reste consultable environ 2 jours, puis il est effacé automatiquement');
     geo.setConsent(ok);
   }
   geo.sync();

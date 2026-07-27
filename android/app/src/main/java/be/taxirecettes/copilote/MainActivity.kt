@@ -38,17 +38,44 @@ class MainActivity : AppCompatActivity() {
         s.domStorageEnabled = true
         @Suppress("DEPRECATION")
         s.databaseEnabled = true
-        s.allowFileAccess = true
+        // Inutile pour file:///android_asset, et ouvrirait la lecture du systeme de fichiers.
+        s.allowFileAccess = false
         s.mediaPlaybackRequiresUserGesture = true
-        web.addJavascriptInterface(TaxiBridge(this), "TaxiNative")
-        web.webViewClient = WebViewClient()
-        // GPS pour le taximetre : autoriser la geolocalisation dans la WebView
+
+        // Le pont natif n'est exposé QUE dans l'app chauffeur, qui charge une page
+        // embarquée. Patron/Admin chargent une page DISTANTE : lui donner accès au
+        // code natif serait une porte d'entrée (script tiers compromis, XSS...).
+        if (BuildConfig.IS_DRIVER) {
+            web.addJavascriptInterface(TaxiBridge(this), "TaxiNative")
+        }
+
+        // Hors réseau, une page distante affiche sinon une erreur système en anglais.
+        web.webViewClient = object : WebViewClient() {
+            override fun onReceivedError(
+                view: WebView,
+                request: android.webkit.WebResourceRequest,
+                error: android.webkit.WebResourceError
+            ) {
+                if (!request.isForMainFrame) return
+                val html = """<meta name="viewport" content="width=device-width,initial-scale=1">
+                    <body style="background:#0F172A;color:#E5E7EB;font:16px system-ui;text-align:center;padding:56px 24px">
+                    <h2 style="margin:0 0 8px">Pas de connexion</h2>
+                    <p style="color:#94A3B8">Cette application a besoin d'internet pour afficher ton tableau de bord.</p>
+                    <p style="margin-top:24px"><a href="" style="color:#FFB020;font-weight:600">Réessayer</a></p>
+                    </body>"""
+                view.loadDataWithBaseURL(
+                    BuildConfig.LAUNCH_URL, html, "text/html", "UTF-8", BuildConfig.LAUNCH_URL
+                )
+            }
+        }
+
         web.webChromeClient = object : WebChromeClient() {
+            // GPS du taximetre : accordé uniquement dans l'app chauffeur.
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                callback?.invoke(origin, BuildConfig.IS_DRIVER, false)
             }
         }
         web.loadUrl(BuildConfig.LAUNCH_URL)

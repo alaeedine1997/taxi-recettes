@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'android/**'
+      - 'index.html'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -36,15 +37,20 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Construire les 3 APK (debug)
+      - name: Synchroniser la page embarquee du chauffeur
+        run: |
+          grep -v 'rel="manifest"' index.html > android/app/src/main/assets/webapp/index.html
+          echo "asset synchronise : $(wc -c < android/app/src/main/assets/webapp/index.html) octets"
+
+      - name: Construire les 3 APK (release)
         working-directory: android
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Préparer les APK
         run: |
-          cp android/app/build/outputs/apk/chauffeur/debug/app-chauffeur-debug.apk   taxi-chauffeur.apk
-          cp android/app/build/outputs/apk/patron/debug/app-patron-debug.apk         taxi-patron.apk
-          cp android/app/build/outputs/apk/superadmin/debug/app-superadmin-debug.apk taxi-admin.apk
+          cp android/app/build/outputs/apk/chauffeur/release/app-chauffeur-release.apk   taxi-chauffeur.apk
+          cp android/app/build/outputs/apk/patron/release/app-patron-release.apk         taxi-patron.apk
+          cp android/app/build/outputs/apk/superadmin/release/app-superadmin-release.apk taxi-admin.apk
           ls -lh taxi-*.apk
 
       - name: Artefacts
