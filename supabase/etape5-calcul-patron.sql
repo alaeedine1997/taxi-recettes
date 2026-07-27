@@ -35,24 +35,12 @@ create policy profiles_patron_read on public.profiles
     and fleet_id = public.my_fleet()
   );
 
--- 2) Le patron peut lire les CARNETS des chauffeurs de sa flotte.
---    LECTURE SEULE : aucune policy d'écriture n'est ajoutée -> il ne peut pas
---    modifier le carnet d'un chauffeur (seul le chauffeur écrit le sien).
+-- 2) [REMPLACÉ PAR L'ÉTAPE 7 — NE PAS RECRÉER]
+--    Le patron lisait ici directement la table carnets, donc TOUT l'historique
+--    du chauffeur. C'est désormais la fonction public.carnet_periode()
+--    (etape7-recette-periode.sql) qui s'en charge, et elle ne renvoie que la
+--    période demandée. On supprime la policy si un ancien passage l'avait créée.
 drop policy if exists carnets_patron_read on public.carnets;
-create policy carnets_patron_read on public.carnets
-  for select
-  to authenticated
-  using (
-    public.my_role_sd() = 'patron'
-    and exists (
-      select 1
-      from public.profiles p
-      where p.id = carnets.user_id
-        and p.role::text = 'chauffeur'
-        and p.fleet_id is not null
-        and p.fleet_id = public.my_fleet()
-    )
-  );
 
 -- Vérification (doit lister les 2 policies + la fonction en security definer) :
 -- select tablename, policyname, cmd from pg_policies

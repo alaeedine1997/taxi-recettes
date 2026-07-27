@@ -744,10 +744,14 @@ function applyPreset(){
 }
 $('cPreset').addEventListener('change', applyPreset);
 ['cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{ $('cPreset').value='custom'; }));
-/* changer de chauffeur ou de période invalide la fiche affichée :
-   on ne doit JAMAIS montrer un règlement calculé pour quelqu'un d'autre */
+/* Changer de chauffeur ou de période invalide la fiche affichée (on ne doit
+   JAMAIS montrer un règlement calculé pour quelqu'un d'autre), puis on
+   recharge automatiquement : c'est un tableau de bord, pas un formulaire. */
+let _autoTimer=null;
 ['cChauf','cPreset','cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{
   _sheet=null; $('cSheet').classList.add('hidden'); $('cErr').textContent='';
+  clearTimeout(_autoTimer);
+  _autoTimer=setTimeout(()=>{ if($('cChauf').value && $('cFrom').value && $('cTo').value) loadSheet(); }, 250);
 }));
 
 /* --- liste des chauffeurs de ma flotte --- */
@@ -756,6 +760,8 @@ function fillChaufList(){
   $('cChauf').innerHTML = list.length
     ? list.map(a=>'<option value="'+a.id+'">'+esc(a.display_name||a.username)+'</option>').join('')
     : '<option value="">— aucun chauffeur —</option>';
+  /* tableau de bord : les chiffres du 1er chauffeur s'affichent d'emblée */
+  if(list.length && !_sheet && $('cFrom').value && $('cTo').value) loadSheet();
 }
 
 /* --- charger la fiche depuis le carnet --- */
@@ -766,18 +772,20 @@ async function loadSheet(){
   if(!from||!to){ $('cErr').textContent='Choisis les deux dates.'; return; }
   if(from>to){ $('cErr').textContent='La date « du » doit être avant la date « au ».'; return; }
   const b=$('cLoad'); b.disabled=true; b.textContent='Chargement…';
-  const r=await api('/rest/v1/carnets?select=data,updated_at&user_id=eq.'+uid);
+  /* Le serveur ne renvoie QUE la période demandée (fonction carnet_periode) :
+     aucun historique hors période ne quitte le serveur. */
+  const r=await api('/rest/v1/rpc/carnet_periode',{method:'POST',body:JSON.stringify({p_driver:uid, p_from:from, p_to:to})});
   b.disabled=false; b.textContent='Charger la fiche';
   if(!r.ok){
-    $('cErr').textContent = (r.status===401||r.status===403)
-      ? 'Accès refusé — lance le SQL de l\'Étape 5 (etape5-calcul-patron.sql).'
-      : (r.status===404 ? 'Table carnets absente sur le serveur.' : 'Chargement impossible.');
+    $('cErr').textContent = (r.status===404)
+      ? 'Fonction absente — lance le SQL de l\'Étape 7 (etape7-recette-periode.sql).'
+      : ((r.status===401||r.status===403) ? 'Accès refusé — vérifie les SQL des Étapes 5 et 7.' : 'Chargement impossible.');
     return;
   }
-  if(!Array.isArray(r.data) || !r.data.length){
+  if(!r.data || typeof r.data!=='object'){
     $('cErr').textContent='Ce chauffeur n\'a pas encore synchronisé son carnet (il doit se connecter dans son app).'; return;
   }
-  const db=r.data[0].data||{}; const days=db.days||{};
+  const db=r.data||{}; const days=db.days||{};
   /* prix du carburant : celui réglé dans le carnet, si le patron n'a rien saisi */
   const fpk=Number(db.fuelPerKm);
   if(isFinite(fpk) && fpk>0 && !num('cFuelKm')) $('cFuelKm').value=String(fpk).replace('.',',');
@@ -804,7 +812,7 @@ async function loadSheet(){
   brut=R(brut); net=R(net); cash=R(cash); charges=R(charges);
   _sheet={uid,from,to,brut,net,cash,km,charges,nDays,kmMissing,rows,
           who:($('cChauf').selectedOptions[0]||{}).textContent||'',
-          synced:r.data[0].updated_at};
+          };
   renderSheet();
   $('cSheet').classList.remove('hidden');
 }
