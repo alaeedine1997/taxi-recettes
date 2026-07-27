@@ -765,8 +765,13 @@ function fillChaufList(){
 }
 
 /* --- charger la fiche depuis le carnet --- */
+let _reqSeq=0;                      /* jeton : une réponse lente ne doit jamais écraser une récente */
 async function loadSheet(){
   const uid=$('cChauf').value, from=$('cFrom').value, to=$('cTo').value;
+  /* Le nom est capturé MAINTENANT : sinon une réponse en retard s'afficherait
+     sous le nom du chauffeur sélectionné entre-temps. */
+  const who=($('cChauf').selectedOptions[0]||{}).textContent||'';
+  const my=++_reqSeq;
   $('cErr').textContent=''; $('cSheet').classList.add('hidden');
   if(!uid){ $('cErr').textContent='Choisis un chauffeur.'; return; }
   if(!from||!to){ $('cErr').textContent='Choisis les deux dates.'; return; }
@@ -775,6 +780,7 @@ async function loadSheet(){
   /* Le serveur ne renvoie QUE la période demandée (fonction carnet_periode) :
      aucun historique hors période ne quitte le serveur. */
   const r=await api('/rest/v1/rpc/carnet_periode',{method:'POST',body:JSON.stringify({p_driver:uid, p_from:from, p_to:to})});
+  if(my!==_reqSeq) return;                      /* réponse périmée : on la jette */
   b.disabled=false; b.textContent='Charger la fiche';
   if(!r.ok){
     $('cErr').textContent = (r.status===404)
@@ -782,7 +788,7 @@ async function loadSheet(){
       : ((r.status===401||r.status===403) ? 'Accès refusé — vérifie les SQL des Étapes 5 et 7.' : 'Chargement impossible.');
     return;
   }
-  if(!r.data || typeof r.data!=='object'){
+  if(!r.data || Array.isArray(r.data) || typeof r.data!=='object' || typeof r.data.days!=='object' || r.data.days===null){
     $('cErr').textContent='Ce chauffeur n\'a pas encore synchronisé son carnet (il doit se connecter dans son app).'; return;
   }
   const db=r.data||{}; const days=db.days||{};
@@ -792,12 +798,14 @@ async function loadSheet(){
   const R=x=>Math.round(x*100)/100;
   let brut=0, net=0, cash=0, km=0, charges=0, nDays=0, kmMissing=0;
   const rows=[];
-  Object.keys(days).filter(k=>k>=from && k<=to).sort().forEach(k=>{
-    const d=days[k]||{};
+  /* On n'accepte QUE des clés de jour au format attendu : le carnet vient du
+     téléphone du chauffeur, donc son contenu n'est pas de confiance. */
+  Object.keys(days).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k) && k>=from && k<=to).sort().forEach(k=>{
+    const d=(days[k] && typeof days[k]==='object') ? days[k] : {};
     /* même filtre que le carnet : on ignore toute course mal formée */
-    const rides=(d.rides||[]).filter(x=>x&&typeof x==='object'&&isFinite(Number(x.amt))&&Number(x.amt)>0)
+    const rides=(Array.isArray(d.rides)?d.rides:[]).filter(x=>x&&typeof x==='object'&&isFinite(Number(x.amt))&&Number(x.amt)>0)
                              .map(x=>Object.assign({},x,{amt:Number(x.amt)}));
-    const dCharges=(d.charges||[]).filter(c=>c&&isFinite(Number(c.amt))&&Number(c.amt)>0);
+    const dCharges=(Array.isArray(d.charges)?d.charges:[]).filter(c=>c&&isFinite(Number(c.amt))&&Number(c.amt)>0);
     const worked = !!(d.openedAt||d.closedAt||rides.length||dCharges.length);
     if(!worked) return;
     const dBrut=R(rides.reduce((a,x)=>a+x.amt,0));
@@ -805,14 +813,15 @@ async function loadSheet(){
     const dCash=R(rides.reduce((a,x)=>a+cRideCash(db,x),0));
     const dCh  =R(dCharges.reduce((a,c)=>a+Number(c.amt),0));
     let dKm=null;
-    if(d.kmStart!=null && d.kmEnd!=null && d.kmEnd>=d.kmStart) dKm=d.kmEnd-d.kmStart; else kmMissing++;
+    /* km convertis en nombres : en chaînes, "100" >= "99" est FAUX (comparaison
+       lexicographique) et produisait un kilométrage négatif. */
+    const kS=Number(d.kmStart), kE=Number(d.kmEnd);
+    if(d.kmStart!=null && d.kmEnd!=null && isFinite(kS) && isFinite(kE) && kE>=kS) dKm=kE-kS; else kmMissing++;
     nDays++; brut+=dBrut; net+=dNet; cash+=dCash; charges+=dCh; if(dKm) km+=dKm;
     rows.push({k,dBrut,dNet,dCash,dCh,dKm,n:rides.length});
   });
   brut=R(brut); net=R(net); cash=R(cash); charges=R(charges);
-  _sheet={uid,from,to,brut,net,cash,km,charges,nDays,kmMissing,rows,
-          who:($('cChauf').selectedOptions[0]||{}).textContent||'',
-          };
+  _sheet={uid,from,to,brut,net,cash,km,charges,nDays,kmMissing,rows,who};
   renderSheet();
   $('cSheet').classList.remove('hidden');
 }
