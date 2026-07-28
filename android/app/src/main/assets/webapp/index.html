@@ -2647,15 +2647,20 @@ const geo=(function(){
     }catch(_){ }
   }
   function onPos(p){
+    const acc=p.coords.accuracy;
+    /* On n'envoie pas les points trop imprécis (premier fix, tunnel, repli Wi-Fi) :
+       ils plaçaient le taxi à des centaines de mètres, voire des km, à côté. */
+    if(acc!=null && acc>120) return;
     const now=Date.now();
     if(now-lastPush < 15000) return;                                        /* throttle ~15 s (batterie + volume) */
     lastPush=now;
-    push(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+    push(p.coords.latitude, p.coords.longitude, acc);
   }
   function start(){
     if(watchId!=null || consent()!=='yes' || !navigator.geolocation) return;
     lastPush=0;
-    try{ watchId=navigator.geolocation.watchPosition(onPos, function(){}, {enableHighAccuracy:true, maximumAge:10000, timeout:20000}); }
+    /* maximumAge:0 -> on veut une position FRAÎCHE, pas une position cachée jusqu'à 10 s */
+    try{ watchId=navigator.geolocation.watchPosition(onPos, function(){}, {enableHighAccuracy:true, maximumAge:0, timeout:20000}); }
     catch(_){ watchId=null; }
     renderPlate();
   }

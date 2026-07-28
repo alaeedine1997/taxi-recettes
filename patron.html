@@ -618,17 +618,23 @@ function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null;
 async function loadLive(){
   const fid=currentMapFleet(); if(!fid || !_map) return;
   const since=new Date(Date.now()-10*60000).toISOString();
-  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
+  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,accuracy,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
   _liveLayer.clearLayers(); const pts=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
     const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
-    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+'<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+'</span>'));
+    const acc=Number(p.accuracy)||0, age=Math.round((Date.now()-Date.parse(p.recorded_at))/60000);
+    /* cercle de précision : montre à quel point la position est fiable */
+    if(acc>0) _liveLayer.addLayer(L.circle([p.lat,p.lng],{radius:acc,color:'#3B82F6',weight:1,fillColor:'#3B82F6',fillOpacity:.10}));
+    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+
+      '<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+(age>=2?' ('+age+' min)':'')+
+      (acc>0?' · ±'+Math.round(acc)+' m':'')+'</span>'));
     pts.push([p.lat,p.lng]);
   });
   $('mapStatus').textContent = pts.length ? (pts.length+' plaque'+(pts.length>1?'s':'')+' en service') : 'Aucune plaque en service';
-  if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(_){ } }
+  /* un seul taxi -> on zoome près (rue) ; plusieurs -> on cadre l'ensemble */
+  if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
 }
 async function loadReplay(plateId){
   if(!_replayLayer) return;
