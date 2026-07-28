@@ -21,6 +21,12 @@ import java.io.File
  */
 class TaxiBridge(private val ctx: Context) {
 
+    init {
+        // Une trace restée en file après une fin de course hors-ligne repart dès
+        // la prochaine ouverture de l'app, même si le taximètre ne tourne plus.
+        try { PositionPush.restore(ctx) } catch (_: Exception) {}
+    }
+
     @JavascriptInterface
     fun isNative(): Boolean = true
 
@@ -123,6 +129,9 @@ class TaxiBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun clearPositionAuth() { PositionPush.clear(ctx) }
+
+    @JavascriptInterface
+    fun stopPositionPush() { PositionPush.stop(ctx) }
 
     @JavascriptInterface
     fun stopMeter(): String {

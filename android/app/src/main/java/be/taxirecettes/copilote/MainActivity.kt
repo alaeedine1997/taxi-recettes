@@ -2,6 +2,7 @@ package be.taxirecettes.copilote
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -10,12 +11,16 @@ import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : AppCompatActivity() {
 
@@ -50,8 +55,19 @@ class MainActivity : AppCompatActivity() {
         s.domStorageEnabled = true
         @Suppress("DEPRECATION")
         s.databaseEnabled = true
-        // Inutile pour file:///android_asset, et ouvrirait la lecture du systeme de fichiers.
+        // Les assets passent par une origine HTTPS interne. Aucun accès file://
+        // ni requête HTTP en clair n'est nécessaire.
         s.allowFileAccess = false
+        @Suppress("DEPRECATION")
+        s.allowFileAccessFromFileURLs = false
+        @Suppress("DEPRECATION")
+        s.allowUniversalAccessFromFileURLs = false
+        // Requis uniquement pour le fichier JSON choisi explicitement par
+        // l'utilisateur via le sélecteur de sauvegarde ci-dessous.
+        s.allowContentAccess = true
+        s.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        s.javaScriptCanOpenWindowsAutomatically = false
+        s.setSupportMultipleWindows(false)
         s.mediaPlaybackRequiresUserGesture = true
 
         // Le pont natif n'est exposé QUE dans l'app chauffeur, qui charge une page
@@ -61,8 +77,49 @@ class MainActivity : AppCompatActivity() {
             web.addJavascriptInterface(TaxiBridge(this), "TaxiNative")
         }
 
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        fun trusted(uri: Uri): Boolean {
+            if (uri.scheme != "https") return false
+            val path = uri.path ?: "/"
+            return if (BuildConfig.IS_DRIVER) {
+                uri.host == "appassets.androidplatform.net" &&
+                    path.startsWith("/assets/webapp/")
+            } else {
+                uri.host == "alaeedine1997.github.io" &&
+                    (path == "/taxi-recettes" || path.startsWith("/taxi-recettes/"))
+            }
+        }
+
+        fun openExternal(uri: Uri) {
+            if (uri.scheme != "https") return
+            try { startActivity(Intent(Intent.ACTION_VIEW, uri)) } catch (_: Exception) {}
+        }
+
         // Hors réseau, une page distante affiche sinon une erreur système en anglais.
         web.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): WebResourceResponse? {
+                if (BuildConfig.IS_DRIVER && request != null) {
+                    assetLoader.shouldInterceptRequest(request.url)?.let { return it }
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                val uri = request?.url ?: return true
+                if (trusted(uri)) return false
+                if (request.isForMainFrame) openExternal(uri)
+                return true
+            }
+
             override fun onReceivedError(
                 view: WebView,
                 request: android.webkit.WebResourceRequest,

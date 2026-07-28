@@ -1,0 +1,11 @@
+{
+  "name": "taxi-recettes-quality",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/check-html.mjs && node tests/regression.mjs && node tests/sync-scenarios.mjs && node tests/sql-baseline.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
+  }
+}

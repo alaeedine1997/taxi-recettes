@@ -1,36 +1,67 @@
-# Activer la création de comptes (fonction serveur `create-user`)
+# Déployer la fonction de gestion des comptes
 
-La création de comptes (patron / chauffeur) a besoin d'une petite **fonction serveur sécurisée**
-(elle utilise une clé secrète qui ne doit jamais être dans le navigateur). Il faut la déployer **une seule fois**.
+Les boutons de création, suppression et réinitialisation de mot de passe utilisent
+l’Edge Function Supabase `rapid-function`.
 
-## Option A — La plus simple (copier-coller dans le dashboard Supabase)
+La clé `service_role` reste exclusivement dans l’environnement protégé de
+Supabase. Elle ne doit jamais être copiée dans le dépôt, le navigateur, Android
+ou un message.
 
-1. Dashboard Supabase → menu de gauche **Edge Functions** → **Deploy a new function** (ou **Create function**).
-2. Nom : `create-user`
-3. Colle le contenu de `site/supabase/functions/create-user/index.ts`.
-4. **Deploy**.
-5. La clé `SUPABASE_SERVICE_ROLE_KEY` et `SUPABASE_URL` sont fournies automatiquement à la fonction — rien à configurer.
+## Méthode recommandée — Supabase CLI
 
-## Option B — Avec l'outil en ligne de commande (si tu l'as)
+Depuis la racine du dépôt :
 
 ```bash
-# une seule fois : se connecter et lier le projet
 supabase login
 supabase link --project-ref trftmfsuucgauglchnfw
-
-# déployer la fonction
-supabase functions deploy create-user
+supabase functions deploy rapid-function \
+  --project-ref trftmfsuucgauglchnfw
 ```
 
-## Vérifier que ça marche
+Le code à déployer est `supabase/functions/rapid-function/index.ts`. Le dossier
+et le slug distant doivent rester exactement `rapid-function`, car les tableaux
+de bord appellent :
 
-Une fois déployée, dis-le-moi : je branche le bouton **« Nouveau compte »** dans le tableau de bord
-(il appelle `POST /functions/v1/create-user`), et on teste la création d'un patron + d'un chauffeur.
+```text
+POST /functions/v1/rapid-function
+```
 
-## Règles de sécurité intégrées (déjà dans le code)
+Conserver la vérification JWT de la passerelle activée. Le navigateur envoie la
+clé publique `sb_publishable_…` dans `apikey` et le JWT de session dans
+`Authorization`. La fonction revérifie ensuite ce JWT avec `auth.getUser()`,
+puis le rôle, l’état actif et la flotte dans `profiles`.
 
-- **Super-admin** : peut créer patrons et chauffeurs, dans n'importe quelle flotte.
-- **Patron** : peut créer uniquement des **chauffeurs**, et seulement dans **SA** flotte.
-- Identifiant = lettres/chiffres/`. _ -`, 2 à 32 caractères → email interne `identifiant@taxi.local`.
-- Si l'identifiant est déjà pris → erreur claire (pas de doublon).
-- Mot de passe minimum 6 caractères.
+## Depuis le Dashboard
+
+1. Ouvrir **Edge Functions** puis **Deploy a new function**.
+2. Donner le nom exact `rapid-function`.
+3. Coller `supabase/functions/rapid-function/index.ts`.
+4. Laisser **Verify JWT** activé.
+5. Déployer.
+
+`SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` sont injectées automatiquement par
+Supabase dans la fonction hébergée. Ne pas créer de copie de ces secrets.
+
+## Vérification sûre
+
+Sans connexion, cet appel doit répondre `401` :
+
+```bash
+curl -i \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'apikey: sb_publishable_mjNmfNZfe-h6Ywj_Gr3g3Q_MZBstjrh' \
+  -d '{"action":"create"}' \
+  'https://trftmfsuucgauglchnfw.supabase.co/functions/v1/rapid-function'
+```
+
+Ensuite, depuis le tableau de bord administrateur connecté :
+
+1. créer un chauffeur d’essai ;
+2. se connecter avec ce chauffeur ;
+3. vérifier qu’il ne voit que son propre carnet ;
+4. supprimer le compte d’essai.
+
+Une réponse `404` signifie que le slug n’est pas déployé. Une réponse `401`
+sans session est normale et confirme que la fonction n’accepte pas un appel
+anonyme.

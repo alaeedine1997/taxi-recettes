@@ -21,6 +21,7 @@ import kotlin.math.sqrt
 object Meter {
 
     @Volatile var running = false
+    private const val MAX_PLAUSIBLE_SPEED_KMH = 180.0
 
     // tarifs (repli sur les valeurs Bruxelles si absent)
     private var priseEnCharge = 2.60
@@ -30,6 +31,7 @@ object Meter {
     private var saut = 0.10
     private var vitesseMinRoule = 3.0
     private var precisionMax = 25.0
+    private var nightApplied = false
 
     // état de la course
     @Volatile private var total = 0.0
@@ -46,17 +48,21 @@ object Meter {
     fun start(tariffs: String) {
         try {
             val o = JSONObject(tariffs)
-            priseEnCharge = o.optDouble("priseEnCharge", 2.60)
-            tarifKm = o.optDouble("tarifKm", 2.30)
-            tarifMinute = o.optDouble("tarifMinute", 0.60)
-            minimumCourse = o.optDouble("minimumCourse", 8.00)
+            priseEnCharge = o.optDouble("priseEnCharge", 2.60).coerceIn(0.0, 100.0)
+            tarifKm = o.optDouble("tarifKm", 2.30).coerceIn(0.0, 20.0)
+            tarifMinute = o.optDouble("tarifMinute", 0.60).coerceIn(0.0, 10.0)
+            minimumCourse = o.optDouble("minimumCourse", 8.00).coerceIn(0.0, 200.0)
             val s = o.optDouble("sautCompteur", 0.10)
-            saut = if (s > 0) s else 0.10
-            vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0)
-            precisionMax = o.optDouble("precisionMax", 25.0)
+            saut = if (s > 0) s.coerceAtMost(10.0) else 0.10
+            vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0).coerceIn(0.0, 100.0)
+            precisionMax = o.optDouble("precisionMax", 25.0).coerceIn(5.0, 200.0)
+            nightApplied = o.optBoolean("applyNight", false)
+            val supplementNuit = o.optDouble("supplementNuit", 2.0).coerceIn(0.0, 50.0)
+            total = priseEnCharge + if (nightApplied) supplementNuit else 0.0
         } catch (_: Exception) {
+            nightApplied = false
+            total = priseEnCharge
         }
-        total = priseEnCharge
         distanceM = 0.0
         tarifNow = "km"
         hasLast = false
@@ -81,7 +87,9 @@ object Meter {
             val dt = (t - lastT) / 1000.0
             if (dt > 0) {
                 var dd = haversine(lastLat, lastLon, lat, lon)
-                if ((dd / dt) * 3.6 < vitesseMinRoule) dd = 0.0   // à l'arrêt : anti-dérive GPS
+                val speed = (dd / dt) * 3.6
+                if (speed > MAX_PLAUSIBLE_SPEED_KMH) return       // saut GPS : ne pas facturer
+                if (speed < vitesseMinRoule) dd = 0.0             // à l'arrêt : anti-dérive GPS
                 distanceM += dd
                 val compKm = tarifKm * (dd / 1000.0)
                 val compMin = tarifMinute * (dt / 60.0)
@@ -107,6 +115,7 @@ object Meter {
         put("km", km())
         put("seconds", seconds())
         put("tarif", tarifNow)
+        put("nightApplied", nightApplied)
     }.toString()
 
     @Synchronized
@@ -137,7 +146,7 @@ object Meter {
                 .put("tarifMinute", tarifMinute).put("minimumCourse", minimumCourse)
                 .put("saut", saut).put("vitesseMinRoule", vitesseMinRoule).put("precisionMax", precisionMax)
                 .put("total", total).put("distanceM", distanceM).put("startAt", startAt)
-                .put("tarifNow", tarifNow)
+                .put("tarifNow", tarifNow).put("nightApplied", nightApplied)
                 .put("lastLat", lastLat).put("lastLon", lastLon).put("lastT", lastT).put("hasLast", hasLast)
             ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("s", o.toString()).apply()
         } catch (_: Exception) {}
@@ -159,6 +168,7 @@ object Meter {
             vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0); precisionMax = o.optDouble("precisionMax", 25.0)
             total = o.optDouble("total", priseEnCharge); distanceM = o.optDouble("distanceM", 0.0)
             startAt = o.optLong("startAt", System.currentTimeMillis()); tarifNow = o.optString("tarifNow", "km")
+            nightApplied = o.optBoolean("nightApplied", false)
             lastLat = o.optDouble("lastLat", 0.0); lastLon = o.optDouble("lastLon", 0.0)
             // On NE facture PAS le trou du kill : le prochain point GPS ré-amorce la
             // position (hasLast=false) au lieu de compter dt sur toute la coupure.

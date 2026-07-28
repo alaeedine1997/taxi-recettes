@@ -56,7 +56,7 @@ class CopiloteAccessibilityService : AccessibilityService() {
                 scanWindows(force = false)
             }
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
-                handleClick(pkg, event.text?.joinToString(" ")?.trim() ?: "")
+                handleClick(pkg, event.text.joinToString(" ").trim())
             }
         }
     }

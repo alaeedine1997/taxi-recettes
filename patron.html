@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123B73">
 <title>Taxi Recettes — Tableau de bord</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin=""></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin></script>
 <style>
   :root{
     --bg:#FAF5EC; --surface:#FFFFFF; --ink:#241C12; --muted:#7C6F5B;
@@ -138,12 +139,23 @@
     padding:11px 18px;border-radius:11px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:100;max-width:90vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
-<link rel="stylesheet" href="ui-system.css">
+<link rel="stylesheet" href="ui-system.css?v=2">
 </head>
-<body>
+<body class="app-manager">
+<a class="skip-link" href="#mainContent">Aller au contenu</a>
 
 <!-- ============ CONNEXION ============ -->
 <section id="login">
+  <div class="login-visual" aria-hidden="true">
+    <span class="login-role">Espace patron</span>
+    <h2>Pilotez votre flotte avec une vue claire.</h2>
+    <p>Recettes, chauffeurs, plaques et positions GPS réunis dans un seul centre opérationnel.</p>
+    <div class="login-feature-list">
+      <span>Suivi GPS en direct</span>
+      <span>Règlements vérifiables</span>
+      <span>Gestion des chauffeurs</span>
+    </div>
+  </div>
   <div class="loginbox">
     <div class="m"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
     <h1 id="loginTitle">Tableau de bord</h1>
@@ -152,9 +164,14 @@
       <label for="lgUser">Identifiant</label>
       <input type="text" id="lgUser" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ex : alae" style="margin-bottom:12px">
       <label for="lgPass">Mot de passe</label>
-      <input type="password" id="lgPass" autocomplete="current-password" placeholder="••••••••">
+      <div class="password-field">
+        <input type="password" id="lgPass" autocomplete="current-password" placeholder="••••••••">
+        <button type="button" class="password-toggle" data-password-target="lgPass" aria-label="Afficher le mot de passe" aria-pressed="false">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <button type="submit" class="btn primary" id="lgSubmit" style="width:100%;margin-top:16px">Se connecter</button>
-      <div class="err" id="lgErr"></div>
+      <div class="err" id="lgErr" role="alert" aria-live="polite"></div>
     </form>
   </div>
 </section>
@@ -165,21 +182,43 @@
     <div class="brand"><span class="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>Taxi Recettes</div>
     <div class="sp"></div>
     <div class="who"><b id="whoName">—</b><div class="r" id="whoRole">—</div></div>
-    <button class="btn sm ghost" id="logoutBtn">Déconnexion</button>
+    <button type="button" class="btn sm ghost" id="logoutBtn">Déconnexion</button>
   </header>
 
   <!-- Menu : une section à la fois, pour ne plus tout empiler sur un écran -->
   <nav class="tabs" id="tabs">
-    <button data-sec="resume" class="on"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg></span>Résumé</button>
-    <button data-sec="recettes"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg></span>Recettes</button>
-    <button data-sec="plaques"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>Plaques</button>
-    <button data-sec="carte"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg></span>Carte</button>
-    <button data-sec="reglages"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></span>Réglages</button>
+    <button type="button" data-sec="resume" class="on"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg></span>Résumé</button>
+    <button type="button" data-sec="recettes"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg></span>Recettes</button>
+    <button type="button" data-sec="plaques"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>Plaques</button>
+    <button type="button" data-sec="carte"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg></span>Carte</button>
+    <button type="button" data-sec="reglages"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></span>Réglages</button>
   </nav>
 
-  <div class="wrap">
-    <h1 class="page" id="pageTitle">Flottes</h1>
+  <main class="wrap" id="mainContent" tabindex="-1">
+    <h1 class="page" id="pageTitle" tabindex="-1">Flottes</h1>
     <p class="sub" id="pageSub">Crée et pilote tes flottes : débloque les options, fixe le nombre de plaques, suspends en un clic.</p>
+
+    <div class="card role-hero manager-hero" id="managerHero" data-sec="resume">
+      <div class="role-hero-copy">
+        <span class="role-eyebrow"><span class="status-dot" aria-hidden="true"></span>Centre opérationnel</span>
+        <h2>Les actions importantes sont à portée de main.</h2>
+        <p>Suivez les véhicules, préparez un règlement ou gérez les plaques sans parcourir tout le tableau de bord.</p>
+      </div>
+      <div class="role-hero-actions">
+        <button type="button" class="role-quick primary" data-jump-sec="carte">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg>
+          <span><strong>Traceur GPS</strong><small>Voir les chauffeurs</small></span>
+        </button>
+        <button type="button" class="role-quick" data-jump-sec="recettes">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg>
+          <span><strong>Règlement</strong><small>Calculer une période</small></span>
+        </button>
+        <button type="button" class="role-quick" data-jump-sec="plaques">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg>
+          <span><strong>Plaques</strong><small>Gérer les véhicules</small></span>
+        </button>
+      </div>
+    </div>
 
     <!-- section sans contenu disponible (ex. carte GPS non débloquée) -->
     <div class="card hidden" id="secEmpty">
@@ -193,7 +232,7 @@
       <div class="row c3">
         <div><label for="nfName">Nom de la flotte</label><input type="text" id="nfName" placeholder="ex : Taxis Étoile"></div>
         <div><label for="nfMax">Plaques max</label><input type="number" id="nfMax" min="0" value="5"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="nfAdd" style="width:100%">Créer</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="nfAdd" style="width:100%">Créer</button></div>
       </div>
       <div class="err" id="nfErr"></div>
     </div>
@@ -212,7 +251,7 @@
       <div class="row c3" id="newPlateRow">
         <div><label for="npLabel">Nouvelle plaque</label><input type="text" id="npLabel" placeholder="ex : TX-AA-101" autocapitalize="characters"></div>
         <div id="npFleetWrap" class="hidden"><label for="npFleet">Flotte</label><select id="npFleet"></select></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="npAdd" style="width:100%">Ajouter</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="npAdd" style="width:100%">Ajouter</button></div>
       </div>
       <div class="err" id="npErr"></div>
       <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
@@ -236,7 +275,7 @@
         <div><label for="cFrom">Du</label><input type="date" id="cFrom"></div>
         <div><label for="cTo">Au</label><input type="date" id="cTo"></div>
       </div>
-      <button class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Calculer cette période</button>
+      <button type="button" class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Calculer cette période</button>
       <div class="err" id="cErr"></div>
 
       <div id="cSheet" class="hidden">
@@ -245,7 +284,7 @@
           <h3>Fiche du chauffeur <span class="muted" id="cSheetWho"></span></h3>
           <div class="cgrid" id="cSheetKpis"></div>
           <p class="chelp" id="cKmNote"></p>
-          <button class="btn sm ghost" id="cDetailBtn" style="margin-top:10px">Voir le détail par jour ▾</button>
+          <button type="button" class="btn sm ghost" id="cDetailBtn" style="margin-top:10px">Voir le détail par jour ▾</button>
           <div id="cDetail" class="hidden" style="margin-top:10px;overflow-x:auto"></div>
         </div>
 
@@ -271,7 +310,7 @@
               <p class="chelp">Le patron a payé pour le chauffeur → le chauffeur lui rembourse.</p></div>
             <div><label for="cChC">Charge en faveur du chauffeur (€)</label><input type="text" inputmode="decimal" id="cChC" value="0">
               <p class="chelp">Le chauffeur a payé pour le patron → le patron lui rembourse.</p>
-              <button class="btn sm ghost hidden" id="cChCFill">Reporter ses charges notées</button></div>
+              <button type="button" class="btn sm ghost hidden" id="cChCFill">Reporter ses charges notées</button></div>
           </div>
           <div style="margin-top:10px"><label for="cKeepCash">Le chauffeur garde le cash ?</label><select id="cKeepCash">
             <option value="1" selected>Oui — il garde le cash encaissé</option>
@@ -291,14 +330,14 @@
       <select id="cfgFleet" class="hidden" style="margin-bottom:12px"></select>
       <div id="cfgSources"></div>
       <div class="row c3" style="margin-top:10px">
-        <div><label for="cfgNewName">Nouvelle source</label><input id="cfgNewName" placeholder="ex : Aéroport"></div>
+        <div><label for="cfgNewName">Nouvelle source</label><input type="text" id="cfgNewName" placeholder="ex : Aéroport"></div>
         <div><label for="cfgNewRate">Retenue %</label><input id="cfgNewRate" type="number" min="0" max="100" value="0"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn" id="cfgAddSrc" style="width:100%">+ Ajouter</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn" id="cfgAddSrc" style="width:100%">+ Ajouter</button></div>
       </div>
       <label class="opt" style="margin-top:8px"><input type="checkbox" id="cfgNewAppCash"> Style Uber / Bolt (« sur l'app + cash », sans commission)</label>
       <div class="row c2" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
         <div><label for="cfgFuel">Carburant € / km</label><input id="cfgFuel" type="number" min="0" step="0.01" value="0"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="cfgSave" style="width:100%">Enregistrer les réglages</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="cfgSave" style="width:100%">Enregistrer les réglages</button></div>
       </div>
       <div class="err" id="cfgErr"></div>
     </div>
@@ -310,10 +349,10 @@
       <div class="frow">
         <select id="mapFleet" class="hidden"></select>
         <select id="mapReplay"><option value="">— Trajet du jour : choisir une plaque —</option></select>
-        <button class="btn sm" id="mapLiveBtn">↻ Rafraîchir</button>
+        <button type="button" class="btn sm" id="mapLiveBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5"/><path d="M20 4v7h-7"/></svg>Rafraîchir</button>
         <span class="muted" id="mapStatus"></span>
       </div>
-      <div class="tracker-list" id="trackerList" aria-label="Véhicules suivis"></div>
+      <section class="tracker-list" id="trackerList" aria-label="Véhicules suivis"></section>
       <div id="map"></div>
     </div>
 
@@ -323,27 +362,27 @@
       <p class="hint">Les chauffeurs et patrons rattachés.</p>
       <div id="accountsList"><div class="empty">Chargement…</div></div>
       <div style="margin-top:14px">
-        <button class="btn" id="newUserToggle">+ Nouveau compte</button>
+        <button type="button" class="btn" id="newUserToggle">+ Nouveau compte</button>
         <div id="newUserForm" class="hidden" style="margin-top:12px;border-top:1px solid var(--line);padding-top:14px">
           <div class="row c2">
-            <div><label for="nuUser">Identifiant</label><input id="nuUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : jean"></div>
-            <div><label for="nuName">Nom affiché</label><input id="nuName" placeholder="ex : Jean D."></div>
+            <div><label for="nuUser">Identifiant</label><input type="text" id="nuUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : jean"></div>
+            <div><label for="nuName">Nom affiché</label><input type="text" id="nuName" placeholder="ex : Jean D."></div>
           </div>
           <div class="row c2" style="margin-top:10px">
-            <div><label for="nuPass">Mot de passe</label><input id="nuPass" type="text" placeholder="min. 6 caractères"></div>
+            <div><label for="nuPass">Mot de passe</label><input id="nuPass" type="password" autocomplete="new-password" placeholder="min. 10 caractères"></div>
             <div id="nuRoleWrap" class="hidden"><label for="nuRole">Rôle</label><select id="nuRole"><option value="chauffeur">Chauffeur</option><option value="patron">Patron</option></select></div>
           </div>
           <div id="nuFleetWrap" class="hidden" style="margin-top:10px"><label for="nuFleet">Flotte</label><select id="nuFleet"></select></div>
-          <button class="btn primary" id="nuCreate" style="margin-top:12px">Créer le compte</button>
+          <button type="button" class="btn primary" id="nuCreate" style="margin-top:12px">Créer le compte</button>
           <div class="err" id="nuErr"></div>
           <p class="hint" style="margin:10px 0 0">L'identifiant de connexion sera <code id="nuPreview">jean</code>. Communique le mot de passe au chauffeur.</p>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const SB_URL='https://trftmfsuucgauglchnfw.supabase.co';
@@ -426,7 +465,11 @@ function applySection(){
     const visible = (el.dataset.sec===_sec) && (el.dataset.allowed!=='0');
     el.classList.toggle('hidden', !visible);
   });
-  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.sec===_sec));
+  document.querySelectorAll('#tabs button').forEach(b=>{
+    const active=b.dataset.sec===_sec;
+    b.classList.toggle('on',active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
   const vide = !document.querySelector('.card[data-sec="'+_sec+'"]:not(.hidden)');
   $('secEmpty').classList.toggle('hidden', !vide);
 }
@@ -440,6 +483,7 @@ const SEC_TXT = {
 function showSection(k){
   _sec=k; applySection();
   const t=SEC_TXT[k]; if(t){ $('pageTitle').textContent=t[0]; $('pageSub').textContent=t[1]; }
+  try{ $('pageTitle').focus({preventScroll:true}); }catch(_){ }
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(_){ window.scrollTo(0,0); }
   if(k==='carte'){
     if(_map){ setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);   /* Leaflet a besoin d'être visible pour se dimensionner */
@@ -447,6 +491,18 @@ function showSection(k){
   } else stopPoll();   /* on quitte la carte : on arrête le rafraîchissement */
 }
 $('tabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-sec]'); if(b) showSection(b.dataset.sec); });
+document.addEventListener('click', e=>{
+  const b=e.target.closest('[data-jump-sec]');
+  if(b) showSection(b.dataset.jumpSec);
+  const toggle=e.target.closest('[data-password-target]');
+  if(toggle){
+    const input=$(toggle.dataset.passwordTarget);
+    const show=input.type==='password';
+    input.type=show?'text':'password';
+    toggle.setAttribute('aria-pressed',show?'true':'false');
+    toggle.setAttribute('aria-label',show?'Masquer le mot de passe':'Afficher le mot de passe');
+  }
+});
 
 function showApp(){
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
@@ -488,7 +544,7 @@ async function loadFleets(){
       '<span class="pill '+(f.suspended?'off':'on')+'">'+(f.suspended?'Suspendue':'Active')+'</span></div>'+
       '<div class="opts">'+opts+'</div>'+
       (isAdmin
-        ? '<div class="frow"><button class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button><span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'
+        ? '<div class="frow"><button type="button" class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button><span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'
         : '<div class="frow"><span class="note" style="border:none;padding:0;background:none">Lecture seule — les options sont réglées par l\'administrateur.</span></div>')+
     '</div>';
   }).join('');
@@ -561,8 +617,8 @@ async function loadPlates(){
         (isAdmin?'<td class="muted">'+esc((p.fleets&&p.fleets.name)||'')+'</td>':'')+
         '<td>'+driver+'</td>'+
         '<td style="text-align:right;white-space:nowrap">'+
-          (s?'<button class="btn sm ghost" data-release="'+s.id+'" data-lbl="'+esc(p.label)+'">Libérer</button> ':'')+
-          '<button class="btn sm ghost" data-plate-act="'+(p.active?'off':'on')+'" data-id="'+p.id+'">'+(p.active?'Désactiver':'Réactiver')+'</button>'+
+          (s?'<button type="button" class="btn sm ghost" data-release="'+s.id+'" data-lbl="'+esc(p.label)+'">Libérer</button> ':'')+
+          '<button type="button" class="btn sm ghost" data-plate-act="'+(p.active?'off':'on')+'" data-id="'+p.id+'">'+(p.active?'Désactiver':'Réactiver')+'</button>'+
         '</td>'+
       '</tr>';
     }).join('')+'</tbody></table>';
@@ -659,7 +715,7 @@ async function loadLive(){
       if(_trackers[k].delayed!==delayed){ _trackers[k].marker.setIcon(trackerIcon(delayed)); _trackers[k].delayed=delayed; }
       _trackers[k].circle.setLatLng([p.lat,p.lng]).setRadius(Math.max(1,acc));
     }
-    cards.push('<button class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
+    cards.push('<button type="button" class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
     pts.push([p.lat,p.lng]);
   });
   Object.keys(_trackers).forEach(k=>{ if(!seen.has(k)){ _liveLayer.removeLayer(_trackers[k].marker); _liveLayer.removeLayer(_trackers[k].circle); _liveLayer.removeLayer(_trackers[k].trail); delete _trackers[k]; } });
@@ -721,11 +777,11 @@ function currentCfgFleet(){ return session.profile.role==='superadmin' ? ($('cfg
 function renderCfgSources(){
   $('cfgSources').innerHTML = _cfgSrc.length ? _cfgSrc.map((s,i)=>
     '<div class="frow" style="gap:8px;margin-top:8px">'+
-      '<input data-cfgname="'+i+'" value="'+esc(s.name)+'" style="flex:1">'+
+      '<input type="text" data-cfgname="'+i+'" value="'+esc(s.name)+'" style="flex:1">'+
       (s.appCash
         ? '<span class="muted" style="min-width:90px;text-align:center;font-size:13px">app + cash</span>'
         : '<input data-cfgrate="'+i+'" type="number" min="0" max="100" value="'+Number(s.rate)+'" style="width:76px"><span class="muted">%</span>')+
-      '<button class="btn sm ghost" data-cfgdel="'+i+'" aria-label="Supprimer">✕</button>'+
+      '<button type="button" class="btn sm ghost" data-cfgdel="'+i+'" aria-label="Supprimer">✕</button>'+
     '</div>'
   ).join('') : '<div class="empty">Aucune source.</div>';
 }
@@ -790,7 +846,7 @@ $('cfgSave').addEventListener('click', async ()=>{
   else $('cfgErr').textContent = r.status===404?'Table fleet_config absente — lance le SQL Étape 4.':(r.status===401||r.status===403?'Non autorisé.':'Échec de l\'enregistrement.');
 });
 
-/* ---- création de comptes (Étape 4, via Edge Function create-user) ---- */
+/* ---- création de comptes (via Edge Function rapid-function) ---- */
 function setupNewUser(){
   const isAdmin=session.profile.role==='superadmin';
   $('nuRoleWrap').classList.toggle('hidden', !isAdmin);
@@ -808,7 +864,7 @@ $('nuCreate').addEventListener('click', async ()=>{
   const fleet_id=isAdmin?$('nuFleet').value:session.profile.fleet_id;
   $('nuErr').textContent='';
   if(!/^[a-z0-9._-]{2,32}$/.test(username)){ $('nuErr').textContent='Identifiant : 2 à 32 caractères (a-z, 0-9, . _ -).'; return; }
-  if((password||'').length<6){ $('nuErr').textContent='Mot de passe : 6 caractères minimum.'; return; }
+  if((password||'').length<10){ $('nuErr').textContent='Mot de passe : 10 caractères minimum.'; return; }
   if(!fleet_id){ $('nuErr').textContent=isAdmin?'Choisis une flotte.':'Ton compte n\'est rattaché à aucune flotte.'; return; }
   const b=$('nuCreate'); b.disabled=true; b.textContent='Création…';
   let r={ok:false,status:0}, d=null;
@@ -824,9 +880,9 @@ $('nuCreate').addEventListener('click', async ()=>{
     $('newUserForm').classList.add('hidden'); loadAccounts();
   } else {
     const e=d&&d.error;
-    const map={identifiant_pris:'Cet identifiant est déjà pris.',username_invalide:'Identifiant invalide.',mdp_court:'Mot de passe trop court.',role:'Rôle invalide.',patron_role:'Un patron ne peut créer que des chauffeurs.',patron_sans_flotte:'Ta flotte n\'est pas définie.',forbidden:'Non autorisé.'};
+    const map={identifiant_pris:'Cet identifiant est déjà pris.',username_invalide:'Identifiant invalide.',mdp_court:'Mot de passe trop court.',role:'Rôle invalide.',patron_role:'Un patron ne peut créer que des chauffeurs.',patron_sans_flotte:'Ta flotte n\'est pas définie.',flotte_suspendue:'Cette flotte est suspendue.',forbidden:'Non autorisé.'};
     $('nuErr').textContent = (r.status===404||r.status===0)
-      ? 'La fonction de création n\'est pas encore déployée sur le serveur (voir site/supabase/DEPLOY.md).'
+      ? 'La fonction « rapid-function » n\'est pas encore déployée sur le serveur (voir supabase/DEPLOY.md).'
       : (map[e]||('Erreur : '+(e||r.status)));
   }
 });
@@ -982,7 +1038,7 @@ function renderSheet(){
     (s.charges>0?'<div class="cbox"><div class="v">'+eur(s.charges)+'</div><div class="k">Charges notées</div></div>':'');
   $('cChCFill').classList.toggle('hidden', !(s.charges>0));
   $('cKmNote').innerHTML = s.kmMissing
-    ? '⚠ '+s.kmMissing+' jour(s) travaillé(s) sans relevé de km complet — ces km ne sont pas comptés, donc le carburant est sous-estimé.'
+    ? 'Attention : '+s.kmMissing+' jour(s) travaillé(s) sans relevé de km complet — ces km ne sont pas comptés, donc le carburant est sous-estimé.'
     : '';
   $('cDetail').innerHTML='<table class="led"><thead><tr><th>Jour</th><th>Courses</th><th>Brut</th><th>Net</th><th>Cash</th><th>Km</th></tr></thead><tbody>'+
     (s.rows.length?s.rows.map(r=>'<tr><td>'+r.k+'</td><td>'+r.n+'</td><td>'+eur(r.dBrut)+'</td><td>'+eur(r.dNet)+'</td><td>'+eur(r.dCash)+'</td><td>'+(r.dKm==null?'—':r.dKm)+'</td></tr>').join('')
@@ -1027,7 +1083,7 @@ function compute(){
     (CC>0?'<tr><td>Charge faveur chauffeur — le patron rembourse</td>'+cell(-CC)+cell(CC)+'</tr>':'')+
     '<tr class="tot"><td>Net</td>'+cell(pat)+cell(chf)+'</tr>'+
     '</tbody></table></div>'+
-    (tipRaw>s.net ? '<p class="chelp" style="color:var(--danger)">⚠ Le pourboire saisi ('+eur(tipRaw)+') dépasse la recette nette — ramené à '+eur(P)+'. Vérifie le montant.</p>' : '')+
+    (tipRaw>s.net ? '<p class="chelp" style="color:var(--danger)">Attention : le pourboire saisi ('+eur(tipRaw)+') dépasse la recette nette — ramené à '+eur(P)+'. Vérifie le montant.</p>' : '')+
     '<div class="settle'+(solde>0?'':' owe')+'">'+
       '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT'+(keeps?' — le chauffeur a gardé '+eur(s.cash)+' en cash':' — le chauffeur a tout remis')+'</div>'+
       '<div class="big">'+(Math.abs(solde)<0.005
@@ -1055,10 +1111,12 @@ $('cChCFill').addEventListener('click', ()=>{ if(_sheet){ $('cChC').value=_sheet
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('lgErr').textContent='';
-  const b=$('lgSubmit'); b.disabled=true; b.textContent='Connexion…';
+  const form=$('loginForm'), b=$('lgSubmit');
+  form.setAttribute('aria-busy','true'); b.disabled=true; b.textContent='Connexion…';
   let res; try{ res=await login($('lgUser').value, $('lgPass').value); }catch(_){ res={ok:false,msg:'Erreur.'}; }
-  b.disabled=false; b.textContent='Se connecter';
-  if(res.ok){ $('lgPass').value=''; showApp(); } else $('lgErr').textContent=res.msg;
+  form.setAttribute('aria-busy','false'); b.disabled=false; b.textContent='Se connecter';
+  if(res.ok){ $('lgPass').value=''; showApp(); }
+  else { $('lgErr').textContent=res.msg; $('lgUser').focus(); }
 });
 $('logoutBtn').addEventListener('click', ()=>{ if(confirm('Se déconnecter ?')) logout(); });
 

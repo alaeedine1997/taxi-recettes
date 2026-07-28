@@ -1,16 +1,20 @@
 # Correctifs post-audit
 
-Branche de travail : `agent/full-ui-ux-overhaul`.
+Le rapport complet et les preuves sont dans `AUDIT-COMPLET.md`. La procédure de
+déploiement et de recette finale est dans `MISE-EN-PRODUCTION.md`.
 
 ## Changements appliqués
 
-- Nouvelle interface commune chauffeur, patron et admin :
-  - design system teal/bleu à fort contraste ;
-  - polices Lexend et Source Sans 3 ;
+- Nouvelle interface adaptée à chaque rôle :
+  - cockpit chauffeur bleu nuit + jaune taxi ;
+  - centre opérationnel patron bleu, avec accès direct au traceur ;
+  - console super admin violette, plus dense ;
+  - police IBM Plex Sans et chiffres tabulaires ;
   - barre latérale sur ordinateur, navigation basse sur mobile ;
   - formulaires et cibles tactiles de 44 px minimum ;
   - calcul de règlement guidé et résultat maintenu visible ;
   - carte avec âge du point et rayon réel de précision.
+  - cache PWA renouvelé pour forcer le chargement du nouveau design.
 - Argent :
   - taux bornés entre 0 et 100 % côté chauffeur et tableaux de bord ;
   - cash `appcash` borné au montant total ;
@@ -28,7 +32,9 @@ Branche de travail : `agent/full-ui-ux-overhaul`.
   - restauration d'une course même après un kill prolongé, sans facturer la coupure ;
   - erreur native de démarrage réellement traitée dans l'interface ;
   - position datée au moment de la mesure et points en cache rejetés ;
-  - autorisation de partage restaurée après redémarrage du process.
+  - autorisation de partage restaurée après redémarrage du process ;
+  - file GPS hors-ligne, refresh du jeton et rejeu après rendu de plaque ;
+  - WebView isolée sous origine HTTPS locale et navigation externe bloquée.
 - Signature :
   - clé privée compromise retirée ;
   - aucun mot de passe de signature dans le dépôt.
@@ -50,17 +56,18 @@ nouvelle clé peut nécessiter de désinstaller l'ancienne APK avant installatio
 
 ```text
 100 000 cas d'argent : OK
+10 000 totaux affichés : OK
 50 000 configurations taximètre web/Android : OK
-Syntaxe JavaScript des 4 pages (dont asset Android) : OK
+Deux téléphones + faux PostgREST : aucune perte : OK
+Migrations SQL exécutées deux fois + RLS adversariale : OK
+Syntaxe JavaScript des 5 pages (dont asset Android) : OK
+3 APK debug + 3 APK release : OK
+Android Lint Vital : aucun problème
 git diff --check : OK
 ```
 
 Commande reproductible :
 
 ```bash
-node tests/regression.mjs
+npm test
 ```
-
-La compilation Android complète n'a pas été exécutée localement : Gradle et le SDK
-Android ne sont pas installés dans l'environnement d'audit. Le workflow GitHub
-reste la validation de compilation faisant autorité.
