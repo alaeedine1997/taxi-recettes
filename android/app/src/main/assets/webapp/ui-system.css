@@ -1,0 +1,241 @@
+:root{
+  --bg:#f4f8f8!important;--surface:#fff!important;--ink:#102a2a!important;--muted:#557070!important;
+  --brand:#0f766e!important;--on-brand:#fff!important;--gold:#0369a1!important;--line:#d7e5e4!important;
+  --ok:#16835a!important;--danger:#dc2626!important;--radius:18px!important;
+  --shadow:0 1px 2px rgba(15,42,42,.04),0 14px 38px -24px rgba(15,42,42,.25)!important;
+  --serif:"Lexend",ui-sans-serif,system-ui,sans-serif!important;
+  --sans:"Source Sans 3",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  color-scheme:light;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#071818!important;--surface:#0d2424!important;--ink:#e9fbf8!important;--muted:#9ab9b5!important;
+    --brand:#2dd4bf!important;--on-brand:#06201d!important;--gold:#38bdf8!important;--line:#23413e!important;
+    --ok:#4ade80!important;--danger:#fb7185!important;
+    --shadow:0 18px 42px -24px rgba(0,0,0,.75)!important;
+  }
+}
+html{scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(circle at 88% -8%,rgba(20,184,166,.12),transparent 26rem),
+    var(--bg)!important;
+  font-family:var(--sans)!important;color:var(--ink)!important;
+}
+button,input,select,textarea{font:inherit}
+button,.btn,.tabs button{touch-action:manipulation}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 34%,transparent)!important;outline-offset:2px}
+.card{
+  border:1px solid var(--line)!important;border-radius:var(--radius)!important;
+  box-shadow:var(--shadow)!important;
+}
+.card h2,h1.page,.loginbox h1,.brand,.fleet .fh .nm,.csec h3,.kpi .n,.cbox .v,.settle .big{
+  font-family:var(--serif)!important;letter-spacing:-.025em;
+}
+.btn{
+  min-height:44px!important;border-radius:12px!important;font-weight:700!important;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease!important;
+}
+.btn.primary{
+  color:var(--on-brand)!important;
+  box-shadow:0 8px 20px -12px color-mix(in srgb,var(--brand) 70%,transparent);
+}
+.btn:not(:disabled):active{transform:translateY(1px)}
+input,select,textarea{
+  min-height:46px!important;border-radius:12px!important;border-color:var(--line)!important;
+}
+input:focus,select:focus,textarea:focus{
+  border-color:var(--brand)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 15%,transparent)!important;
+}
+.pill,.rolechip,.chip{border-radius:999px!important}
+.note{border-style:solid!important;background:color-mix(in srgb,var(--brand) 5%,var(--surface))!important}
+.err:not(:empty){padding:9px 11px;border-radius:10px;background:color-mix(in srgb,var(--danger) 9%,transparent)}
+.toast{bottom:max(22px,env(safe-area-inset-bottom))!important;border-radius:14px!important}
+#map{
+  min-height:430px!important;border:1px solid var(--line);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
+}
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important}
+.cgrid,.kpis{gap:12px!important}
+.cbox,.kpi{
+  border-radius:14px!important;
+  background:color-mix(in srgb,var(--brand) 4%,var(--surface))!important;
+}
+table{font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--surface);z-index:1}
+#calcCard>h2:before,#cSheet>.csec>h3:before{
+  display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:9px;
+  background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);
+  font:800 13px/1 var(--serif);vertical-align:middle;
+}
+#calcCard>h2:before{content:"1"}
+#cSheet>.csec:nth-child(1)>h3:before{content:"2"}
+#cSheet>.csec:nth-child(2)>h3:before{content:"3"}
+#cResult{
+  position:sticky;bottom:10px;z-index:8;background:var(--surface)!important;
+  border:1px solid color-mix(in srgb,var(--brand) 38%,var(--line))!important;
+  border-radius:16px;padding:16px!important;box-shadow:0 18px 42px -24px rgba(0,0,0,.45);
+}
+
+/* Tableaux de bord : poste de pilotage sur grand écran. */
+@media(min-width:901px){
+  #app{min-height:100dvh}
+  #app header.top{
+    position:fixed!important;left:248px;right:0;top:0;height:72px;margin:0!important;
+    padding:13px 28px!important;background:color-mix(in srgb,var(--surface) 88%,transparent)!important;
+    backdrop-filter:blur(14px);z-index:30!important;
+  }
+  #app .tabs{
+    position:fixed!important;inset:0 auto 0 0;width:248px;display:flex!important;flex-direction:column;
+    gap:7px!important;padding:92px 14px 18px!important;overflow:visible!important;
+    background:#092f2d!important;border:0!important;box-shadow:14px 0 36px -30px #001816;
+    z-index:40!important;
+  }
+  #app .tabs:before{
+    content:"TAXI RECETTES";position:absolute;top:25px;left:22px;color:#fff;
+    font:700 17px/1 var(--serif);letter-spacing:.04em;
+  }
+  #app .tabs button{
+    width:100%;min-height:48px!important;justify-content:flex-start!important;border:0!important;
+    border-radius:12px!important;padding:11px 14px!important;background:transparent!important;
+    color:#a8cbc6!important;font-weight:700!important;
+  }
+  #app .tabs button:hover{background:rgba(255,255,255,.08)!important;color:#fff!important}
+  #app .tabs button.on{
+    background:#fff!important;color:#0f615b!important;
+    box-shadow:0 10px 26px -18px #000!important;
+  }
+  #app .tabs .ic{
+    width:28px;height:28px;display:grid;place-items:center;border-radius:8px;
+    background:rgba(255,255,255,.09);font-size:15px!important;
+  }
+  #app .tabs button.on .ic{background:#dff8f4}
+  #app .wrap{
+    max-width:1440px!important;margin:0 0 0 248px!important;padding:100px 32px 80px!important;
+  }
+  #app h1.page{font-size:32px!important;margin:0 0 3px!important}
+  #app .sub{max-width:760px;margin-bottom:25px!important}
+  #app .card{padding:22px!important}
+  #app .row.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #app .row.c3{grid-template-columns:repeat(2,minmax(0,1fr)) auto}
+  #app #calcCard,#app #mapCard{max-width:1180px}
+}
+
+/* Navigation basse, lisible et utilisable d'une main. */
+@media(max-width:900px){
+  #app header.top{
+    position:sticky!important;top:0!important;margin:0!important;
+    background:color-mix(in srgb,var(--surface) 90%,transparent)!important;
+    backdrop-filter:blur(12px);z-index:30!important;
+  }
+  #app .tabs{
+    position:fixed!important;inset:auto 0 0 0!important;top:auto!important;
+    display:grid!important;grid-template-columns:repeat(5,1fr);gap:2px!important;
+    padding:7px 6px calc(7px + env(safe-area-inset-bottom))!important;
+    background:color-mix(in srgb,var(--surface) 94%,transparent)!important;
+    border-top:1px solid var(--line)!important;border-bottom:0!important;
+    box-shadow:0 -14px 36px -28px rgba(0,0,0,.5);backdrop-filter:blur(16px);z-index:60!important;
+  }
+  #app .tabs button{
+    min-width:0!important;min-height:54px!important;padding:5px 2px!important;border:0!important;
+    border-radius:12px!important;background:transparent!important;display:flex!important;
+    flex-direction:column;justify-content:center;gap:1px!important;font-size:11px!important;
+  }
+  #app .tabs button.on{color:var(--brand)!important;background:color-mix(in srgb,var(--brand) 10%,transparent)!important}
+  #app .tabs .ic{font-size:18px!important}
+  #app .wrap{padding-bottom:calc(100px + env(safe-area-inset-bottom))!important}
+  #app h1.page{font-size:26px!important}
+  #map{height:58dvh!important;min-height:360px!important}
+}
+@media(max-width:430px){
+  #app .top .btn.ghost{font-size:0;padding:8px!important;width:44px}
+  #app .top .btn.ghost:after{content:"↪";font-size:21px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+/* Application chauffeur : interface de terrain, compacte et utilisable d'une main. */
+body:not(:has(#app)){
+  --bg:#f2f7f7!important;--surface:#fff!important;--surface2:#f6faf9!important;
+  --text:#102a2a!important;--text2:#58716f!important;
+  --primary:#0b3f3b!important;--on-primary:#fff!important;
+  --accent:#0f8a78!important;--accent-press:#0b6d60!important;--on-accent:#fff!important;
+  --border:#d7e5e4!important;--chip-bg:#e7f1ef!important;
+  --shadow:0 1px 2px rgba(15,42,42,.05),0 12px 32px -24px rgba(15,42,42,.4)!important;
+}
+body:not(:has(#app)) header.app{
+  background:color-mix(in srgb,var(--primary) 94%,transparent)!important;
+  backdrop-filter:blur(14px);padding-inline:16px!important;
+}
+body:not(:has(#app)) header.app:after{
+  content:"Mode chauffeur";font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:#9fe4da;border:1px solid rgba(159,228,218,.3);border-radius:999px;padding:3px 7px;
+}
+body:not(:has(#app)) header.app .sub{margin-left:0!important}
+body:not(:has(#app)) .wrap{max-width:560px!important;padding-inline:12px!important}
+body:not(:has(#app)) .card{padding:16px!important;margin-top:12px!important}
+body:not(:has(#app)) .card h2{
+  color:var(--text2)!important;font:700 12px/1.35 var(--serif)!important;letter-spacing:.055em!important;
+}
+body:not(:has(#app)) .stat .v{font-family:var(--serif);letter-spacing:-.035em}
+body:not(:has(#app)) .btn-accent{
+  background:linear-gradient(135deg,#0f8a78,#0f766e)!important;
+  box-shadow:0 12px 24px -16px rgba(15,118,110,.8);
+}
+body:not(:has(#app)) .taxi-meter{
+  border-radius:20px!important;border-color:#224540!important;
+  background:radial-gradient(120% 130% at 50% 0%,#173d39 0%,#071513 67%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 20px 34px -28px #000!important;
+}
+body:not(:has(#app)) .tm-brand{color:#7dd3c7!important}
+body:not(:has(#app)) .tm-price{color:#f9c74f!important;text-shadow:0 0 18px rgba(249,199,79,.38)!important}
+body:not(:has(#app)) nav.tabs{
+  display:grid!important;grid-template-columns:repeat(4,1fr)!important;
+  background:color-mix(in srgb,var(--surface) 94%,transparent)!important;
+  backdrop-filter:blur(16px);box-shadow:0 -14px 36px -28px rgba(0,0,0,.5);
+}
+body:not(:has(#app)) nav.tabs button.on{
+  color:var(--accent)!important;background:color-mix(in srgb,var(--accent) 10%,transparent)!important;
+}
+body:not(:has(#app)) .quick-grid{grid-template-columns:minmax(0,1fr) minmax(92px,1fr) minmax(92px,1fr)!important}
+body:not(:has(#app)) .quick-grid.appcash{grid-template-columns:minmax(0,1fr) minmax(90px,1fr) minmax(90px,1fr)!important}
+#welcomeScreen,#authScreen{
+  background:
+    radial-gradient(circle at 50% -10%,rgba(20,184,166,.18),transparent 26rem),
+    var(--bg)!important;
+  color:var(--text)!important;font-family:var(--sans)!important;
+}
+#welcomeScreen .m,.auth-badge,.platebar .pb-ico,#platePicker .pp-item .tag{
+  background:var(--accent)!important;box-shadow:0 12px 28px -16px rgba(15,118,110,.75)!important;
+}
+#welcomeScreen h1,.auth-title,#platePicker .pp-title{font-family:var(--serif)!important}
+#welcomeScreen .sub,#welcomeScreen .note{color:var(--text2)!important}
+#welcomeScreen .wbtn.primary{
+  background:var(--accent)!important;border-color:var(--accent)!important;color:var(--on-accent)!important;
+}
+#welcomeScreen .wbtn.ghost{border-color:var(--border)!important;color:var(--text)!important}
+#authScreen{
+  --a-brand:var(--accent)!important;--a-surface:var(--surface)!important;--a-muted:var(--text2)!important;
+  --a-line:var(--border)!important;--a-danger:var(--danger)!important;--a-ink:var(--text)!important;
+}
+.auth-card{border-radius:20px!important;box-shadow:var(--shadow)!important}
+.acc-avatar{background:color-mix(in srgb,var(--accent) 12%,transparent)!important;color:var(--accent)!important}
+#platePicker{background:rgba(1,22,20,.64)!important;backdrop-filter:blur(8px)}
+#platePicker .pp-wrap{background:var(--surface)!important}
+#platePicker .pp-item:hover{border-color:var(--accent)!important}
+@media(max-width:390px){
+  body:not(:has(#app)) .quick-grid,body:not(:has(#app)) .quick-grid.appcash{
+    grid-template-columns:1fr 1fr!important;
+  }
+  body:not(:has(#app)) .quick-grid .qname{grid-column:1/-1}
+}
+@media(prefers-color-scheme:dark){
+  body:not(:has(#app)){
+    --bg:#061716!important;--surface:#0d2523!important;--surface2:#102e2b!important;
+    --text:#ebfbf8!important;--text2:#9abbb6!important;--primary:#0b3935!important;
+    --accent:#2dd4bf!important;--accent-press:#14b8a6!important;--on-accent:#06201d!important;
+    --border:#244541!important;--chip-bg:#173532!important;
+  }
+}

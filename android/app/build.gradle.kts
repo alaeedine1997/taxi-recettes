@@ -41,23 +41,24 @@ android {
         }
     }
 
-    signingConfigs {
-        create("stable") {
-            storeFile = file("signing/taxi.keystore")
-            storePassword = "taxicopilote"
-            keyAlias = "taxi"
-            keyPassword = "taxicopilote"
-        }
-    }
+    val releaseKeystore = System.getenv("ANDROID_KEYSTORE_PATH")
+    val releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    val stableSigning = if (!releaseKeystore.isNullOrBlank()) signingConfigs.create("stable") {
+        storeFile = file(releaseKeystore)
+        storePassword = releaseStorePassword
+        keyAlias = releaseKeyAlias
+        keyPassword = releaseKeyPassword
+    } else null
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("stable")
+            signingConfig = stableSigning
         }
         getByName("debug") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("stable")
         }
     }
 

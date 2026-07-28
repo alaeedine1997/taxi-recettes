@@ -56,7 +56,7 @@ class TaximeterService : Service() {
                 Meter.snapshot(this@TaximeterService)
                 lastSnap = now
             }
-            PositionPush.maybePush(loc.latitude, loc.longitude, acc)   // position live vers la carte du patron
+            PositionPush.maybePush(this@TaximeterService, loc.latitude, loc.longitude, acc, t)
         }
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
@@ -92,6 +92,7 @@ class TaximeterService : Service() {
             return START_NOT_STICKY
         }
         startLocation()
+        PositionPush.restore(this) // reprend le partage après un redémarrage du process
         showBubble()
         handler.removeCallbacks(ticker)
         handler.post(ticker)

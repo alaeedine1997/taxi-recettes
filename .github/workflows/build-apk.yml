@@ -40,10 +40,24 @@ jobs:
       - name: Synchroniser la page embarquee du chauffeur
         run: |
           grep -v 'rel="manifest"' index.html > android/app/src/main/assets/webapp/index.html
+          cp ui-system.css android/app/src/main/assets/webapp/ui-system.css
           echo "asset synchronise : $(wc -c < android/app/src/main/assets/webapp/index.html) octets"
+
+      - name: Préparer la signature privée
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Secret ANDROID_KEYSTORE_BASE64 manquant"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/taxi-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/taxi-signing/release.keystore"
 
       - name: Construire les 3 APK (release)
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/taxi-signing/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Préparer les APK

@@ -1,7 +1,9 @@
 package be.taxirecettes.copilote
 
+import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -19,6 +21,7 @@ import java.net.URL
  * qu'alors) ; entre deux courses, c'est la page web qui envoie (au premier plan).
  */
 object PositionPush {
+    private const val PREF = "taxi_position_push"
 
     @Volatile private var url: String? = null
     @Volatile private var key: String? = null
@@ -32,7 +35,7 @@ object PositionPush {
     private const val MAX_ACCURACY = 120f     // on n'envoie pas un fix trop imprécis
 
     @Synchronized
-    fun configure(json: String) {
+    fun configure(ctx: Context, json: String) {
         try {
             val o = JSONObject(json)
             url = o.optString("url").ifBlank { null }
@@ -42,21 +45,32 @@ object PositionPush {
             fleetId = o.optString("fleetId").ifBlank { null }
             plateId = o.optString("plateId").ifBlank { null }
             lastSent = 0L
-        } catch (_: Exception) { clear() }
+            ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("config", json).apply()
+        } catch (_: Exception) { clear(ctx) }
     }
 
     @Synchronized
-    fun clear() {
+    fun clear(ctx: Context? = null) {
         url = null; key = null; token = null; driverId = null; fleetId = null; plateId = null
+        try { ctx?.getSharedPreferences(PREF, Context.MODE_PRIVATE)?.edit()?.remove("config")?.apply() } catch (_: Exception) {}
+    }
+
+    @Synchronized
+    fun restore(ctx: Context) {
+        if (ready()) return
+        val json = try { ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("config", null) } catch (_: Exception) { null }
+        if (!json.isNullOrBlank()) configure(ctx, json)
     }
 
     private fun ready(): Boolean =
         url != null && key != null && token != null && driverId != null && fleetId != null
 
-    fun maybePush(lat: Double, lon: Double, accuracy: Float) {
+    fun maybePush(ctx: Context, lat: Double, lon: Double, accuracy: Float, recordedAt: Long) {
+        restore(ctx)
         if (!ready()) return
         if (accuracy > 0f && accuracy > MAX_ACCURACY) return
         val now = System.currentTimeMillis()
+        if (recordedAt > 0L && now - recordedAt > 30_000L) return // jamais publier un ancien fix mis en cache
         synchronized(this) {
             if (now - lastSent < MIN_INTERVAL) return
             lastSent = now
@@ -71,6 +85,7 @@ object PositionPush {
                         .put("plate_id", pid ?: JSONObject.NULL)
                         .put("lat", lat).put("lng", lon)
                         .put("accuracy", Math.round(accuracy).toInt())
+                        .put("recorded_at", Instant.ofEpochMilli(recordedAt).toString())
                 ).toString()
                 val conn = (URL("$u/rest/v1/positions").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
@@ -85,7 +100,7 @@ object PositionPush {
                 val code = conn.responseCode
                 conn.disconnect()
                 // jeton expiré (course > ~1 h) : on arrête d'essayer jusqu'au prochain configure()
-                if (code == 401 || code == 403) clear()
+                if (code == 401 || code == 403) clear(ctx)
             } catch (_: Exception) {
                 // hors-ligne / erreur : on réessaiera au prochain point GPS
             }

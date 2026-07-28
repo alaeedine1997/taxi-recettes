@@ -92,10 +92,12 @@ object Meter {
         lastLat = lat; lastLon = lon; lastT = t; hasLast = true
     }
 
-    private fun roundSaut(p: Double): Double = Math.round(p / saut) * saut
+    private fun roundSaut(p: Double): Double = Math.round(Math.round(p / saut) * saut * 100.0) / 100.0
 
     fun livePrice(): Double = roundSaut(total)
-    private fun finalPrice(): Double = roundSaut(max(total, minimumCourse))
+    /* Même ordre que le web : saut d'abord, minimum ensuite. Arrondir le minimum
+       au saut pouvait faire repasser le montant final sous le minimum configuré. */
+    private fun finalPrice(): Double = Math.round(max(roundSaut(total), minimumCourse) * 100.0) / 100.0
     fun km(): Double = Math.round(distanceM / 10.0) / 100.0
     fun seconds(): Long = if (startAt == 0L) 0 else (System.currentTimeMillis() - startAt) / 1000
 
@@ -148,12 +150,9 @@ object Meter {
             val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("s", null) ?: return false
             val o = JSONObject(s)
             if (!o.optBoolean("running", false)) return false
-            // Course trop ancienne (service relancé bien plus tard, ou vieux snapshot) :
-            // on l'abandonne au lieu de facturer tout le temps écoulé pendant le kill.
-            val lastTs = o.optLong("lastT", 0L)
-            if (lastTs > 0L && System.currentTimeMillis() - lastTs > 5 * 60 * 1000L) {
-                clearSnapshot(ctx); return false
-            }
+            /* Même un snapshot ancien représente de l'argent réel : on restaure la
+               course, mais hasLast=false ci-dessous garantit que le temps et la
+               distance de la coupure ne sont jamais facturés. */
             priseEnCharge = o.optDouble("priseEnCharge", 2.60); tarifKm = o.optDouble("tarifKm", 2.30)
             tarifMinute = o.optDouble("tarifMinute", 0.60); minimumCourse = o.optDouble("minimumCourse", 8.00)
             saut = o.optDouble("saut", 0.10).let { if (it > 0) it else 0.10 }

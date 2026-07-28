@@ -6,7 +6,7 @@
 <title>Taxi Recettes — Tableau de bord</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin=""></script>
 <style>
@@ -166,6 +166,7 @@
     padding:11px 18px;border-radius:11px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:100;max-width:90vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
+<link rel="stylesheet" href="ui-system.css">
 </head>
 <body>
 
@@ -197,11 +198,11 @@
 
   <!-- Menu : une section a la fois -->
   <nav class="tabs" id="tabs">
-    <button data-sec="global" class="on"><span class="ic">🌍</span>Global</button>
-    <button data-sec="recettes"><span class="ic">💶</span>Recettes</button>
-    <button data-sec="plaques"><span class="ic">🚕</span>Plaques</button>
-    <button data-sec="carte"><span class="ic">🗺️</span>Carte</button>
-    <button data-sec="reglages"><span class="ic">⚙️</span>Réglages</button>
+    <button data-sec="global" class="on"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span>Global</button>
+    <button data-sec="recettes"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg></span>Recettes</button>
+    <button data-sec="plaques"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>Plaques</button>
+    <button data-sec="carte"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg></span>Carte</button>
+    <button data-sec="reglages"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></span>Réglages</button>
   </nav>
   <div class="wrap">
     <h1 class="page" id="pageTitle">Flottes</h1>
@@ -263,8 +264,8 @@
     </div>
 
     <div class="card" id="calcCard" data-sec="recettes" data-allowed="0">
-      <h2>Calcul de recette</h2>
-      <p class="hint">Choisis un chauffeur et une période (une semaine, un mois, deux mois…). La recette est construite à partir de ce qu'il a noté dans son carnet.</p>
+      <h2>Préparer un règlement</h2>
+      <p class="hint">Choisis le chauffeur et la période. La fiche se charge automatiquement, puis tu ajustes uniquement les éléments nécessaires.</p>
       <div class="row c2">
         <div><label for="cChauf">Chauffeur</label><select id="cChauf"><option value="">— chargement —</option></select></div>
         <div><label for="cPreset">Période</label><select id="cPreset">
@@ -279,7 +280,7 @@
         <div><label for="cFrom">Du</label><input type="date" id="cFrom"></div>
         <div><label for="cTo">Au</label><input type="date" id="cTo"></div>
       </div>
-      <button class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Charger la fiche</button>
+      <button class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Calculer cette période</button>
       <div class="err" id="cErr"></div>
 
       <div id="cSheet" class="hidden">
@@ -349,7 +350,7 @@
     <!-- Carte GPS en direct -->
     <div class="card hidden" id="mapCard" data-sec="carte" data-allowed="0">
       <h2>Carte en direct</h2>
-      <p class="hint">Position des plaques en service (le chauffeur a pris sa plaque et partagé sa position).</p>
+      <p class="hint">Position mesurée du chauffeur, heure du dernier point et rayon de précision GPS. Le cercle autour du taxi représente l'incertitude réelle.</p>
       <div class="frow">
         <select id="mapFleet" class="hidden"></select>
         <select id="mapReplay"><option value="">— Trajet du jour : choisir une plaque —</option></select>
@@ -785,7 +786,7 @@ $('platesList').addEventListener('click', async e=>{
 });
 
 /* ---- carte GPS (Étape 3) ---- */
-let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null;
+let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0;
 function ensureMap(){
   if(_map) return _map;
   if(typeof L==='undefined'){ return null; }
@@ -801,23 +802,25 @@ async function loadLive(){
   const fid=currentMapFleet();
   const isAll = IS_ADMIN_APP && !fid;   /* super-admin : toutes les flottes */
   if(!fid && !isAll) return;
+  const requestedFleet=fid||'__all__', my=++_liveReqSeq;
   const since=new Date(Date.now()-10*60000).toISOString();
   const filter = isAll ? '' : '&fleet_id=eq.'+fid;
   const r=await api('/rest/v1/positions?select=plate_id,fleet_id,lat,lng,accuracy,recorded_at,plates(label),profiles(username,display_name)&recorded_at=gte.'+since+filter+'&order=recorded_at.desc&limit=2000');
+  if(my!==_liveReqSeq || requestedFleet!==(currentMapFleet()||'__all__')) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
   _liveLayer.clearLayers(); const pts=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
     const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
     const flLine = isAll ? '<br><span style="color:#888">'+esc(fleetName(p.fleet_id)||'')+'</span>' : '';
-    const acc=Number(p.accuracy)||0, age=Math.round((Date.now()-Date.parse(p.recorded_at))/60000);
-    if(acc>0) _liveLayer.addLayer(L.circle([p.lat,p.lng],{radius:acc,color:'#3B82F6',weight:1,fillColor:'#3B82F6',fillOpacity:.10}));
+    const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
+    if(acc>0) _liveLayer.addLayer(L.circle([p.lat,p.lng],{radius:acc,color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}));
     _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+flLine+
-      '<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+(age>=2?' ('+age+' min)':'')+
+      '<br><span style="color:#557070">'+(ageSec<60?'Direct · il y a '+ageSec+' s':'Dernière position · il y a '+Math.round(ageSec/60)+' min')+
       (acc>0?' · ±'+Math.round(acc)+' m':'')+'</span>'));
     pts.push([p.lat,p.lng]);
   });
-  $('mapStatus').textContent = pts.length ? (pts.length+' plaque'+(pts.length>1?'s':'')+' en service') : 'Aucune plaque en service';
+  $('mapStatus').textContent = pts.length ? ('Actualisé · '+pts.length+' plaque'+(pts.length>1?'s':'')+' localisée'+(pts.length>1?'s':'')) : 'Aucune position depuis 10 minutes';
   if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
 }
 async function loadReplay(plateId){
@@ -862,7 +865,7 @@ $('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay'
 $('mapLiveBtn').addEventListener('click', loadLive);
 
 /* ---- réglages de flotte : sources + carburant (Étape 4) ---- */
-let _cfgSrc=[];
+let _cfgSrc=[], _cfgReqSeq=0;
 const DEF_SRC=[
   {id:'uber',name:'Uber',rate:0,builtin:true,appCash:true},
   {id:'bolt',name:'Bolt',rate:0,builtin:true,appCash:true},
@@ -884,13 +887,23 @@ function renderCfgSources(){
 }
 async function loadCfg(){
   const fid=currentCfgFleet();
-  if(!fid){ _cfgSrc=[]; renderCfgSources(); return; }
+  const my=++_cfgReqSeq;
+  if(!fid){ _cfgSrc=[]; renderCfgSources(); $('cfgSave').disabled=true; return; }
+  $('cfgSave').disabled=true;
   const r=await api('/rest/v1/fleet_config?select=sources,fuel_per_km&fleet_id=eq.'+fid);
+  if(my!==_cfgReqSeq || fid!==currentCfgFleet()) return;
   if(r.ok && Array.isArray(r.data) && r.data.length && Array.isArray(r.data[0].sources) && r.data[0].sources.length){
     _cfgSrc = r.data[0].sources.map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)||0,builtin:!!s.builtin,appCash:!!s.appCash}));
     $('cfgFuel').value = Number(r.data[0].fuel_per_km)||0;
+    $('cfgErr').textContent=''; $('cfgSave').disabled=false;
   } else if(r.status===404){ $('cfgSources').innerHTML='<div class="empty">Table fleet_config absente — lance le SQL de l\'Étape 4.</div>'; return; }
-  else { _cfgSrc = DEF_SRC.slice(); $('cfgFuel').value=0; }   /* pas encore de config → défauts */
+  else if(r.ok){ _cfgSrc = DEF_SRC.slice(); $('cfgFuel').value=0; $('cfgErr').textContent=''; $('cfgSave').disabled=false; }
+  else {
+    _cfgSrc=[]; renderCfgSources();
+    $('cfgSources').innerHTML='<div class="empty">Réglages non chargés (connexion ou droits).</div>';
+    $('cfgErr').textContent='Réglages non chargés — enregistrement désactivé pour protéger la configuration.';
+    return;
+  }
   renderCfgSources();
 }
 $('cfgFleet').addEventListener('change', loadCfg);
@@ -1078,6 +1091,7 @@ $('cPreset').addEventListener('change', applyPreset);
    recharge automatiquement : c'est un tableau de bord, pas un formulaire. */
 let _autoTimer=null;
 ['cChauf','cPreset','cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{
+  _reqSeq++; /* invalide immédiatement la requête déjà partie, avant le debounce */
   _sheet=null; $('cSheet').classList.add('hidden'); $('cErr').textContent='';
   clearTimeout(_autoTimer);
   _autoTimer=setTimeout(()=>{ if($('cChauf').value && $('cFrom').value && $('cTo').value) loadSheet(); }, 250);
@@ -1113,7 +1127,7 @@ async function loadSheet(){
      aucun historique hors période ne quitte le serveur. */
   const r=await api('/rest/v1/rpc/carnet_periode',{method:'POST',body:JSON.stringify({p_driver:uid, p_from:from, p_to:to})});
   if(my!==_reqSeq) return;                      /* réponse périmée : on la jette */
-  b.disabled=false; b.textContent='Charger la fiche';
+  b.disabled=false; b.textContent='Calculer cette période';
   if(!r.ok){
     $('cErr').textContent = (r.status===404)
       ? 'Fonction absente — lance le SQL de l\'Étape 7 (etape7-recette-periode.sql).'
