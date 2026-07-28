@@ -3,20 +3,32 @@ package be.taxirecettes.copilote
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var web: WebView
+
+    // Import d'une sauvegarde : sans ce sélecteur de fichiers, le bouton « Importer »
+    // (un <input type=file> dans la page) ne faisait rien du tout.
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private val fileChooser =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            filePathCallback?.onReceiveValue(if (uri != null) arrayOf(uri) else arrayOf())
+            filePathCallback = null
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,6 +88,24 @@ class MainActivity : AppCompatActivity() {
                 callback: GeolocationPermissions.Callback?
             ) {
                 callback?.invoke(origin, BuildConfig.IS_DRIVER, false)
+            }
+
+            // Ouvre le sélecteur de fichiers quand la page a un <input type=file>
+            // (bouton « Importer une sauvegarde »).
+            override fun onShowFileChooser(
+                webView: WebView?,
+                callback: ValueCallback<Array<Uri>>?,
+                params: FileChooserParams?
+            ): Boolean {
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = callback
+                return try {
+                    fileChooser.launch("*/*")   // le contenu JSON est validé par la page
+                    true
+                } catch (_: Exception) {
+                    filePathCallback = null
+                    false
+                }
             }
         }
         web.loadUrl(BuildConfig.LAUNCH_URL)

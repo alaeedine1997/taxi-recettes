@@ -1,14 +1,18 @@
 package be.taxirecettes.copilote
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import androidx.core.content.ContextCompat
+import java.io.File
 
 /**
  * Pont entre la page web (carnet + taximètre) et le natif.
@@ -19,6 +23,40 @@ class TaxiBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun isNative(): Boolean = true
+
+    /* ---------------- Sauvegarde du carnet dans Téléchargements ----------------
+       Le lien blob:// ne télécharge rien dans une WebView : c'est le natif qui
+       écrit le fichier, et il renvoie {"ok":true,"path":...} SEULEMENT si l'écriture
+       a vraiment réussi (avant, l'app disait « prête » sans rien écrire). */
+    @JavascriptInterface
+    fun saveBackup(filename: String, content: String): String {
+        return try {
+            val name = filename.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "taxi-sauvegarde.json" }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = ctx.contentResolver
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: return "{\"ok\":false}"
+                resolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                    ?: return "{\"ok\":false}"
+                values.clear(); values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+                "{\"ok\":true,\"path\":\"Téléchargements/$name\"}"
+            } else {
+                // Anciennes versions : dossier de l'app (pas de permission requise).
+                val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                    ?: return "{\"ok\":false}"
+                File(dir, name).writeText(content, Charsets.UTF_8)
+                "{\"ok\":true,\"path\":\"dossier de l'app / Download / $name\"}"
+            }
+        } catch (_: Exception) {
+            "{\"ok\":false}"
+        }
+    }
 
     /* ---------------- Taximètre natif (arrière-plan + bulle) ---------------- */
 

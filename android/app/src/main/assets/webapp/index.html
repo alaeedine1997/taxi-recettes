@@ -1600,10 +1600,23 @@ async function download(filename, blob){
   setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 60000);
   return true;
 }
-$('exportBtn').addEventListener('click', ()=>{
+$('exportBtn').addEventListener('click', async ()=>{
   pruneEmptyDays();
-  download('taxi-donnees-'+todayKey()+'.json', new Blob([JSON.stringify(db,null,2)],{type:'application/json'}))
-    .then(ok=>{ if(ok) toast('Sauvegarde prête'); });
+  const json = JSON.stringify(db,null,2);
+  const filename = 'taxi-donnees-'+todayKey()+'.json';
+  /* App Android : le lien blob:// ne télécharge RIEN dans une WebView. On écrit le
+     fichier via le pont natif (dans Téléchargements) et on confirme SEULEMENT si
+     l'écriture a vraiment réussi — avant, on disait « prête » sans rien écrire. */
+  try{
+    if(window.TaxiNative && TaxiNative.saveBackup){
+      let ok=false, path=''; try{ const o=JSON.parse(TaxiNative.saveBackup(filename, json)); ok=!!o.ok; path=o.path||''; }catch(_){}
+      toast(ok ? ('Sauvegarde enregistrée dans '+(path||'Téléchargements')) : 'Sauvegarde impossible (mémoire pleine ?)');
+      return;
+    }
+  }catch(_){ }
+  /* web (Safari iPhone / PC) : partage natif ou lien de téléchargement */
+  const ok = await download(filename, new Blob([json],{type:'application/json'}));
+  if(ok) toast('Sauvegarde prête');
 });
 $('importBtn').addEventListener('click', ()=>$('importFile').click());
 $('importFile').addEventListener('change', e=>{
