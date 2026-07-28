@@ -313,6 +313,7 @@
         <button class="btn sm" id="mapLiveBtn">↻ Rafraîchir</button>
         <span class="muted" id="mapStatus"></span>
       </div>
+      <div class="tracker-list" id="trackerList" aria-label="Véhicules suivis"></div>
       <div id="map"></div>
     </div>
 
@@ -613,7 +614,11 @@ $('platesList').addEventListener('click', async e=>{
 });
 
 /* ---- carte GPS (Étape 3) ---- */
-let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0;
+let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0,_trackers={};
+function trackerIcon(delayed){
+  return L.divIcon({className:'',iconSize:[42,42],iconAnchor:[13,36],popupAnchor:[8,-34],html:
+    '<span class="taxi-pin'+(delayed?' delayed':'')+'"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>'});
+}
 function ensureMap(){
   if(_map) return _map;
   if(typeof L==='undefined'){ return null; }
@@ -634,21 +639,36 @@ async function loadLive(){
   if(my!==_liveReqSeq || fid!==currentMapFleet()) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
-  _liveLayer.clearLayers(); const pts=[];
+  const seen=new Set(), pts=[], cards=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
     const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
     const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
-    /* cercle de précision : montre à quel point la position est fiable */
-    if(acc>0) _liveLayer.addLayer(L.circle([p.lat,p.lng],{radius:acc,color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}));
-    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+
-      '<br><span style="color:#557070">'+(ageSec<60?'Direct · il y a '+ageSec+' s':'Dernière position · il y a '+Math.round(ageSec/60)+' min')+
-      (acc>0?' · ±'+Math.round(acc)+' m':'')+'</span>'));
+    const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+
+      '<br><span style="color:#557070">'+(delayed?'Dernière position · il y a '+Math.round(ageSec/60)+' min':'Direct · il y a '+ageSec+' s')+
+      (acc>0?' · précision ±'+Math.round(acc)+' m':'')+'</span>';
+    seen.add(k);
+    if(!_trackers[k]){
+      const trailPts=(r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]);
+      const trail=L.polyline(trailPts,{color:'#0F766E',weight:4,opacity:.7,lineCap:'round'}).addTo(_liveLayer);
+      const marker=L.marker([p.lat,p.lng],{icon:trackerIcon(delayed)}).bindPopup(popup).addTo(_liveLayer);
+      const circle=L.circle([p.lat,p.lng],{radius:Math.max(1,acc),color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}).addTo(_liveLayer);
+      _trackers[k]={marker,circle,trail,delayed};
+    }else{
+      _trackers[k].trail.setLatLngs((r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]));
+      _trackers[k].marker.setLatLng([p.lat,p.lng]).setPopupContent(popup);
+      if(_trackers[k].delayed!==delayed){ _trackers[k].marker.setIcon(trackerIcon(delayed)); _trackers[k].delayed=delayed; }
+      _trackers[k].circle.setLatLng([p.lat,p.lng]).setRadius(Math.max(1,acc));
+    }
+    cards.push('<button class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
     pts.push([p.lat,p.lng]);
   });
+  Object.keys(_trackers).forEach(k=>{ if(!seen.has(k)){ _liveLayer.removeLayer(_trackers[k].marker); _liveLayer.removeLayer(_trackers[k].circle); _liveLayer.removeLayer(_trackers[k].trail); delete _trackers[k]; } });
+  $('trackerList').innerHTML=cards.join('');
   $('mapStatus').textContent = pts.length ? ('Actualisé · '+pts.length+' plaque'+(pts.length>1?'s':'')+' localisée'+(pts.length>1?'s':'')) : 'Aucune position depuis 10 minutes';
   /* un seul taxi -> on zoome près (rue) ; plusieurs -> on cadre l'ensemble */
   if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
 }
+$('trackerList').addEventListener('click',e=>{ const b=e.target.closest('[data-track]'); if(!b||!_trackers[b.dataset.track]) return; const m=_trackers[b.dataset.track].marker; _map.flyTo(m.getLatLng(),17,{duration:.65}); m.openPopup(); });
 async function loadReplay(plateId){
   if(!_replayLayer) return;
   _replayLayer.clearLayers();

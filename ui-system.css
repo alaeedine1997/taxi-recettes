@@ -56,6 +56,26 @@ input:focus,select:focus,textarea:focus{
   min-height:430px!important;border:1px solid var(--line);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
 }
+.tracker-list{display:flex;gap:9px;overflow-x:auto;padding:10px 1px 3px;scrollbar-width:none}
+.tracker-list::-webkit-scrollbar{display:none}
+.tracker-car{
+  flex:0 0 auto;min-width:180px;min-height:56px;border:1px solid var(--line);border-radius:13px;
+  background:var(--surface);color:var(--ink);padding:9px 11px;text-align:left;cursor:pointer;
+  display:grid;grid-template-columns:auto 1fr;gap:2px 9px;align-items:center;
+}
+.tracker-car:hover,.tracker-car:focus-visible{border-color:var(--brand)}
+.tracker-car .tracker-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 13%,transparent);grid-row:1/3}
+.tracker-car.delayed .tracker-dot{background:#d97706;box-shadow:0 0 0 4px rgba(217,119,6,.13)}
+.tracker-car strong{font:700 14px/1.2 var(--serif)}
+.tracker-car small{color:var(--muted);font-size:12px}
+.taxi-pin{
+  width:42px;height:42px;border-radius:14px 14px 14px 4px;background:#0f766e;color:#fff;
+  display:grid;place-items:center;border:3px solid #fff;box-shadow:0 8px 22px -8px rgba(0,0,0,.65);
+  transform:rotate(-45deg);
+}
+.taxi-pin svg{transform:rotate(45deg)}
+.taxi-pin.delayed{background:#d97706}
+.leaflet-marker-icon{transition:transform .8s linear}
 .leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important}
 .cgrid,.kpis{gap:12px!important}
 .cbox,.kpi{
