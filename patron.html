@@ -472,6 +472,9 @@ async function loadFleets(){
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
   _fleetsCache=fleets; fillNpFleet(); setupMapCard(); setupNewUser(); setupCfgCard();   /* plaque + carte GPS + comptes + réglages flotte */
+  /* Recettes = option débloquée par l'administrateur (opt_recettes) */
+  const myF=fleets.find(f=>f.id===session.profile.fleet_id)||null;
+  setAllowed('calcCard', !!(myF && !myF.suspended && myF.opt_recettes));
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -579,7 +582,14 @@ async function addPlate(){
   const fleet_id = isAdmin ? $('npFleet').value : session.profile.fleet_id;
   if(!fleet_id){ $('npErr').textContent = isAdmin?'Choisis une flotte (crée-en une d\'abord).':'Ton compte n\'est rattaché à aucune flotte.'; return; }
   const r=await api('/rest/v1/plates',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify([{label, fleet_id}])});
-  if(!r.ok){ $('npErr').textContent = r.status===409?'Cette plaque existe déjà dans la flotte.':(r.status===401||r.status===403?'Non autorisé.':'Création impossible.'); return; }
+  if(!r.ok){
+    const msg=((r.data&&r.data.message)||'')+' '+((r.data&&r.data.hint)||'');   /* message + hint : le garde-fou serveur met 'limite_plaques' dans le hint */
+    $('npErr').textContent =
+      r.status===409 ? 'Cette plaque existe déjà dans la flotte.'
+      : (/limite_plaques/i.test(msg) ? 'Limite de plaques atteinte pour cette flotte — augmente d’abord « Plaques max ».'
+      : (r.status===401||r.status===403 ? 'Non autorisé.' : 'Création impossible.'));
+    return;
+  }
   $('npLabel').value=''; toast('Plaque « '+label+' » ajoutée'); loadPlates();
 }
 $('npAdd').addEventListener('click', addPlate);

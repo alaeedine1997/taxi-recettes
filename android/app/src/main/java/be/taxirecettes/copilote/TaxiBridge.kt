@@ -41,11 +41,17 @@ class TaxiBridge(private val ctx: Context) {
                 }
                 val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                     ?: return "{\"ok\":false}"
-                resolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
-                    ?: return "{\"ok\":false}"
-                values.clear(); values.put(MediaStore.Downloads.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
-                "{\"ok\":true,\"path\":\"Téléchargements/$name\"}"
+                try {
+                    val out = resolver.openOutputStream(uri)
+                        ?: run { resolver.delete(uri, null, null); return "{\"ok\":false}" }
+                    out.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                    values.clear(); values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                    "{\"ok\":true,\"path\":\"Téléchargements\"}"
+                } catch (_: Exception) {
+                    resolver.delete(uri, null, null)   // pas d'entrée fantôme "en attente"
+                    "{\"ok\":false}"
+                }
             } else {
                 // Anciennes versions : dossier de l'app (pas de permission requise).
                 val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
