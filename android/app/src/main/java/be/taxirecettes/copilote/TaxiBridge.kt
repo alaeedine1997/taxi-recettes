@@ -115,6 +115,14 @@ class TaxiBridge(private val ctx: Context) {
     @JavascriptInterface
     fun meterState(): String = try { Meter.stateJson() } catch (_: Exception) { "{\"running\":false}" }
 
+    /* Partage de position pendant une course : la page fournit les identifiants
+       (URL, clé publique, jeton, ids) UNIQUEMENT si consentement + plaque prise. */
+    @JavascriptInterface
+    fun setPositionAuth(json: String) { try { PositionPush.configure(json) } catch (_: Exception) {} }
+
+    @JavascriptInterface
+    fun clearPositionAuth() { PositionPush.clear() }
+
     @JavascriptInterface
     fun stopMeter(): String {
         val res = try { Meter.stop() } catch (_: Exception) { "{}" }

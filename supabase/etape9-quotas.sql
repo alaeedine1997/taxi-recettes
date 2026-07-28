@@ -19,11 +19,15 @@ declare
   maxp int;
   cnt  int;
 begin
+  if public.my_role_sd() = 'superadmin' then
+    return new;                       -- le super-admin (qui FIXE le quota) n'est pas bloqué par lui
+  end if;
   if not coalesce(new.active, true) then
     return new;                       -- une plaque inactive ne consomme pas d'emplacement
   end if;
   select max_plates into maxp from public.fleets where id = new.fleet_id;
   if maxp is not null and maxp > 0 then
+    perform 1 from public.fleets where id = new.fleet_id for update;   -- sérialise les ajouts concurrents d'une même flotte
     select count(*) into cnt
       from public.plates
      where fleet_id = new.fleet_id

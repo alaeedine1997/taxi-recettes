@@ -1,5 +1,6 @@
 package be.taxirecettes.copilote
 
+import android.content.Context
 import org.json.JSONObject
 import kotlin.math.asin
 import kotlin.math.cos
@@ -116,5 +117,51 @@ object Meter {
         }.toString()
         running = false
         return lastResult
+    }
+
+    /* ---------- Persistance : survivre à un kill du service (MIUI) ----------
+       L'état vit uniquement en RAM. Si le système tue le process en pleine course,
+       tout serait perdu en silence. On sauvegarde après chaque point GPS et on
+       restaure au redémarrage du service (START_STICKY). */
+    private const val PREF = "taxi_meter_state"
+
+    @Synchronized
+    fun snapshot(ctx: Context) {
+        if (!running) return
+        try {
+            val o = JSONObject()
+                .put("running", true)
+                .put("priseEnCharge", priseEnCharge).put("tarifKm", tarifKm)
+                .put("tarifMinute", tarifMinute).put("minimumCourse", minimumCourse)
+                .put("saut", saut).put("vitesseMinRoule", vitesseMinRoule).put("precisionMax", precisionMax)
+                .put("total", total).put("distanceM", distanceM).put("startAt", startAt)
+                .put("tarifNow", tarifNow)
+                .put("lastLat", lastLat).put("lastLon", lastLon).put("lastT", lastT).put("hasLast", hasLast)
+            ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("s", o.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    /** Restaure une course interrompue. Renvoie true si une course était en cours. */
+    @Synchronized
+    fun restore(ctx: Context): Boolean {
+        return try {
+            val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("s", null) ?: return false
+            val o = JSONObject(s)
+            if (!o.optBoolean("running", false)) return false
+            priseEnCharge = o.optDouble("priseEnCharge", 2.60); tarifKm = o.optDouble("tarifKm", 2.30)
+            tarifMinute = o.optDouble("tarifMinute", 0.60); minimumCourse = o.optDouble("minimumCourse", 8.00)
+            saut = o.optDouble("saut", 0.10).let { if (it > 0) it else 0.10 }
+            vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0); precisionMax = o.optDouble("precisionMax", 25.0)
+            total = o.optDouble("total", priseEnCharge); distanceM = o.optDouble("distanceM", 0.0)
+            startAt = o.optLong("startAt", System.currentTimeMillis()); tarifNow = o.optString("tarifNow", "km")
+            lastLat = o.optDouble("lastLat", 0.0); lastLon = o.optDouble("lastLon", 0.0)
+            lastT = o.optLong("lastT", 0L); hasLast = o.optBoolean("hasLast", false)
+            running = true
+            true
+        } catch (_: Exception) { false }
+    }
+
+    fun clearSnapshot(ctx: Context) {
+        try { ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove("s").apply() } catch (_: Exception) {}
     }
 }

@@ -48,7 +48,10 @@ class TaximeterService : Service() {
     private val locListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
             val t = if (loc.time > 0) loc.time else System.currentTimeMillis()
-            Meter.onLocation(loc.latitude, loc.longitude, t, if (loc.hasAccuracy()) loc.accuracy else 0f)
+            val acc = if (loc.hasAccuracy()) loc.accuracy else 0f
+            Meter.onLocation(loc.latitude, loc.longitude, t, acc)
+            Meter.snapshot(this@TaximeterService)   // état persistant : survit à un kill du service
+            PositionPush.maybePush(loc.latitude, loc.longitude, acc)   // position live vers la carte du patron
         }
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
@@ -67,12 +70,18 @@ class TaximeterService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            Meter.clearSnapshot(this)   // course terminée normalement : plus rien à restaurer
             teardown()
             stopSelf()
             return START_NOT_STICKY
         }
         startForegroundNow()          // exigence Android : passer en foreground tout de suite
-        if (!Meter.running) {          // état vide (ex. redémarrage OS) : ne pas lancer un compteur fantôme
+        if (!Meter.running) {
+            // Redémarrage après un kill du système (intent null) : on tente de
+            // restaurer la course sauvegardée au lieu de la perdre en silence.
+            Meter.restore(this)
+        }
+        if (!Meter.running) {          // vraiment rien à reprendre : pas de compteur fantôme
             teardown()
             stopSelf()
             return START_NOT_STICKY
@@ -81,7 +90,9 @@ class TaximeterService : Service() {
         showBubble()
         handler.removeCallbacks(ticker)
         handler.post(ticker)
-        return START_NOT_STICKY
+        // START_STICKY : si le système nous tue, il relance le service (intent null)
+        // et on reprend la course grâce à Meter.restore().
+        return START_STICKY
     }
 
     private fun startForegroundNow() {
