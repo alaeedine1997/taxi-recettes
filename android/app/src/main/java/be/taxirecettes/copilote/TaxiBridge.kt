@@ -126,6 +126,9 @@ class TaxiBridge(private val ctx: Context) {
     @JavascriptInterface
     fun stopMeter(): String {
         val res = try { Meter.stop() } catch (_: Exception) { "{}" }
+        // Effacer le snapshot ICI (pas seulement via l'intent ACTION_STOP) : si le
+        // démarrage du service échouait, un snapshot "running" ressusciterait la course.
+        try { Meter.clearSnapshot(ctx) } catch (_: Exception) {}
         try {
             val i = Intent(ctx, TaximeterService::class.java)
             i.action = TaximeterService.ACTION_STOP

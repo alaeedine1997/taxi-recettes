@@ -44,13 +44,18 @@ class TaximeterService : Service() {
     private var lm: LocationManager? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var lastSnap = 0L
 
     private val locListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
             val t = if (loc.time > 0) loc.time else System.currentTimeMillis()
             val acc = if (loc.hasAccuracy()) loc.accuracy else 0f
             Meter.onLocation(loc.latitude, loc.longitude, t, acc)
-            Meter.snapshot(this@TaximeterService)   // état persistant : survit à un kill du service
+            val now = System.currentTimeMillis()
+            if (now - lastSnap > 5000L) {   // sauvegarde throttlée (~5 s) : moins d'usure flash
+                Meter.snapshot(this@TaximeterService)
+                lastSnap = now
+            }
             PositionPush.maybePush(loc.latitude, loc.longitude, acc)   // position live vers la carte du patron
         }
         override fun onProviderEnabled(provider: String) {}

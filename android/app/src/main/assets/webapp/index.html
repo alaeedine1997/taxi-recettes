@@ -2080,20 +2080,30 @@ const taxi = (function(){
     const s=st.seconds|0;
     $('taxiTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
     $('taxiTarif').textContent = st.tarif==='temps'?'Tarif attente':'Tarif km';
+    /* rafraîchit le jeton du partage GPS natif (~4 min) : sinon il expirait (~1 h)
+       et la position gelait sur la carte du patron pour le reste de la course */
+    if(window.__nativePush && (Date.now()-_posArmAt > 240000)) armPositionPush();
+  }
+  /* Fournit au service natif de quoi pousser la position (URL, clé, jeton FRAIS, ids),
+     mais seulement si plaque prise + consentement. À rappeler périodiquement : le
+     jeton expire (~1 h), et il faut le ré-armer après un redémarrage du service. */
+  let _posArmAt=0;
+  function armPositionPush(){
+    if(!NATIVE || !TaxiNative.setPositionAuth) return;
+    if(!(plates.required() && plates.active() && geo.consent()==='yes')){
+      window.__nativePush=false; try{ TaxiNative.clearPositionAuth(); }catch(_){ } return;
+    }
+    (async()=>{ try{ await auth.ensureFresh();
+      TaxiNative.setPositionAuth(JSON.stringify({url:SB_URL, key:SB_KEY, token:auth.token(),
+        driverId:auth.userId(), fleetId:auth.fleetId(), plateId:(plates.active()||{}).plateId||''}));
+      window.__nativePush=true; _posArmAt=Date.now();
+    }catch(_){ } })();
   }
   function startNative(){
     try{
       if(TaxiNative.canOverlay && !TaxiNative.canOverlay()){ TaxiNative.requestOverlay(); toast('Autorise « afficher par-dessus les autres apps » pour la bulle'); }
       TaxiNative.startMeter(tariffsJson());
-      /* Position live vers la carte du patron PENDANT la course (même écran
-         verrouillé) : uniquement si le chauffeur a pris une plaque et consenti. */
-      try{
-        if(TaxiNative.setPositionAuth && plates.required() && plates.active() && geo.consent()==='yes'){
-          (async()=>{ try{ await auth.ensureFresh();
-            TaxiNative.setPositionAuth(JSON.stringify({url:SB_URL, key:SB_KEY, token:auth.token(),
-              driverId:auth.userId(), fleetId:auth.fleetId(), plateId:(plates.active()||{}).plateId||''})); }catch(_){ } })();
-        } else if(TaxiNative.clearPositionAuth){ TaxiNative.clearPositionAuth(); }
-      }catch(_){ }
+      armPositionPush();
     }catch(_){ toast('Impossible de démarrer le compteur'); return; }
     running=true;
     $('taxiStart').classList.add('hidden'); $('taxiStop').classList.remove('hidden'); $('taxiDone').classList.add('hidden');
@@ -2103,6 +2113,7 @@ const taxi = (function(){
   }
   function stopNative(){
     let res={}; try{ res=JSON.parse(TaxiNative.stopMeter()); }catch(_){ }
+    window.__nativePush=false;
     try{ if(TaxiNative.clearPositionAuth) TaxiNative.clearPositionAuth(); }catch(_){ }   /* fin de course : on arrête le partage GPS natif */
     running=false; if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
     lastFinal=res.price!=null?res.price:0; lastKm=res.km!=null?res.km:0; lastMin=!!res.minApplied;
@@ -2116,6 +2127,7 @@ const taxi = (function(){
       running=true;
       $('taxiStart').classList.add('hidden'); $('taxiStop').classList.remove('hidden'); $('taxiDone').classList.add('hidden');
       setGps('actif — continue en arrière-plan','live');
+      armPositionPush();   /* après un kill+reprise du service, le partage GPS natif était perdu : on le ré-arme */
       if(pollTimer) clearInterval(pollTimer);
       pollTimer=setInterval(nativePoll,1000); nativePoll();
       return true;

@@ -148,6 +148,12 @@ object Meter {
             val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("s", null) ?: return false
             val o = JSONObject(s)
             if (!o.optBoolean("running", false)) return false
+            // Course trop ancienne (service relancé bien plus tard, ou vieux snapshot) :
+            // on l'abandonne au lieu de facturer tout le temps écoulé pendant le kill.
+            val lastTs = o.optLong("lastT", 0L)
+            if (lastTs > 0L && System.currentTimeMillis() - lastTs > 5 * 60 * 1000L) {
+                clearSnapshot(ctx); return false
+            }
             priseEnCharge = o.optDouble("priseEnCharge", 2.60); tarifKm = o.optDouble("tarifKm", 2.30)
             tarifMinute = o.optDouble("tarifMinute", 0.60); minimumCourse = o.optDouble("minimumCourse", 8.00)
             saut = o.optDouble("saut", 0.10).let { if (it > 0) it else 0.10 }
@@ -155,7 +161,9 @@ object Meter {
             total = o.optDouble("total", priseEnCharge); distanceM = o.optDouble("distanceM", 0.0)
             startAt = o.optLong("startAt", System.currentTimeMillis()); tarifNow = o.optString("tarifNow", "km")
             lastLat = o.optDouble("lastLat", 0.0); lastLon = o.optDouble("lastLon", 0.0)
-            lastT = o.optLong("lastT", 0L); hasLast = o.optBoolean("hasLast", false)
+            // On NE facture PAS le trou du kill : le prochain point GPS ré-amorce la
+            // position (hasLast=false) au lieu de compter dt sur toute la coupure.
+            lastT = 0L; hasLast = false
             running = true
             true
         } catch (_: Exception) { false }
