@@ -114,7 +114,7 @@
   .chip.on{border-color:rgba(79,122,67,.55);color:var(--ok);font-weight:600}
 
   /* menu de sections */
-  .tabs{position:sticky;top:56px;z-index:9;display:flex;gap:6px;overflow-x:auto;padding:10px 18px 12px;
+  .tabs{position:sticky;top:66px;z-index:9;display:flex;gap:6px;overflow-x:auto;padding:10px 18px 12px;
     background:var(--bg);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   @media(max-width:430px){
@@ -122,7 +122,7 @@
     .brand .m{font-size:16px;margin-right:2px}
     header.top{padding:10px 14px;gap:8px}
     .who{font-size:12px} .who b{font-size:13px} .who .r{font-size:10px;letter-spacing:.02em}
-    .tabs{top:52px;padding:9px 14px 11px}
+    .tabs{top:58px;padding:9px 14px 11px}
     .wrap{padding:0 14px 90px}
   }
   .tabs button{flex:0 0 auto;min-height:42px;padding:8px 15px;border-radius:999px;border:1.5px solid var(--line);
@@ -787,11 +787,7 @@ function ensureMap(){
   _liveLayer=L.layerGroup().addTo(_map); _replayLayer=L.layerGroup().addTo(_map);
   return _map;
 }
-function currentMapFleet(){ return currentFleet();
-}
-function _ancienCurrentMapFleet(){
-  return session.profile.role==='superadmin' ? ($('mapFleet').value||null) : session.profile.fleet_id;
-}
+function currentMapFleet(){ return currentFleet(); }
 function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
 async function loadLive(){
   if(!_map) return;
@@ -846,8 +842,9 @@ function setupMapCard(){
   if(!ensureMap()){ $('mapStatus').textContent='Carte indisponible (Leaflet non chargé).'; return; }
   $('mapFleet').classList.add('hidden');
   setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
-  fillReplayPlates(); loadLive();
-  _pollTimer=setInterval(loadLive, 8000);
+  fillReplayPlates();
+  /* le rafraîchissement (une requête toutes les 8 s) ne tourne QUE sur l'onglet Carte */
+  if(_sec==='carte'){ loadLive(); _pollTimer=setInterval(loadLive, 8000); }
 }
 $('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
 $('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
@@ -884,13 +881,6 @@ async function loadCfg(){
   } else if(r.status===404){ $('cfgSources').innerHTML='<div class="empty">Table fleet_config absente — lance le SQL de l\'Étape 4.</div>'; return; }
   else { _cfgSrc = DEF_SRC.slice(); $('cfgFuel').value=0; }   /* pas encore de config → défauts */
   renderCfgSources();
-}
-function setupCfgCard(){
-  const show = !!currentFleet();
-  setAllowed('cfgCard', show);
-  if(!show) return;
-  $('cfgFleet').classList.add('hidden');
-  loadCfg();
 }
 $('cfgFleet').addEventListener('change', loadCfg);
 $('cfgSources').addEventListener('input', e=>{
@@ -987,7 +977,10 @@ function showSection(k){
   _sec=k; applySection();
   const t=SEC_TXT[k]; if(t){ $('pageTitle').textContent=t[0]; $('pageSub').textContent=t[1]; }
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(_){ window.scrollTo(0,0); }
-  if(k==='carte' && _map) setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
+  if(k==='carte'){
+    if(_map){ setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
+              loadLive(); if(!_pollTimer) _pollTimer=setInterval(loadLive, 8000); }
+  } else stopPoll();
 }
 $('tabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-sec]'); if(b) showSection(b.dataset.sec); });
 
@@ -1009,8 +1002,10 @@ function onFleetChange(silencieux){
   setAllowed('calcCard',   !!f);
   setAllowed('mapCard',    !!(f && !f.suspended && (f.opt_gps_live||f.opt_replay)));
   if(!f) return;
+  /* on efface l'ancienne fiche AVANT fillChaufList : sinon _sheet contient encore
+     la fiche de l'ancienne flotte et l'auto-chargement du 1er chauffeur est sauté */
+  if(!silencieux){ _sheet=null; $('cSheet').classList.add('hidden'); }
   loadPlates(); loadCfg(); fillChaufList();
-  if(!silencieux) { _sheet=null; $('cSheet').classList.add('hidden'); }
   setupMapCard();
 }
 $('fbFleet').addEventListener('change', ()=>onFleetChange(false));
