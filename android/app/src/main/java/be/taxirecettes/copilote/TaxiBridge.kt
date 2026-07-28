@@ -115,6 +115,8 @@ class TaxiBridge(private val ctx: Context) {
                 ctx.startService(i)
             "{\"ok\":true}"
         } catch (_: Exception) {
+            try { Meter.stop() } catch (_: Exception) {}
+            try { Meter.clearSnapshot(ctx) } catch (_: Exception) {}
             "{\"ok\":false,\"err\":\"service\"}"
         }
     }

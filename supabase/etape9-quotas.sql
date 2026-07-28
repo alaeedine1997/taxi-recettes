@@ -104,7 +104,7 @@ as $$
             and not f.suspended
         )
       )
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 revoke all on function public.carnet_periode(uuid, date, date) from public, anon;

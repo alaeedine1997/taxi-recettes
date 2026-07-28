@@ -6,6 +6,10 @@ const driver=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const patron=fs.readFileSync(new URL('../patron.html',import.meta.url),'utf8');
 const admin=fs.readFileSync(new URL('../admin.html',import.meta.url),'utf8');
 const meter=fs.readFileSync(new URL('../android/app/src/main/java/be/taxirecettes/copilote/Meter.kt',import.meta.url),'utf8');
+const meterMath=fs.readFileSync(new URL('../android/app/src/main/java/be/taxirecettes/copilote/MeterMath.kt',import.meta.url),'utf8');
+const taxiBridge=fs.readFileSync(
+  new URL('../android/app/src/main/java/be/taxirecettes/copilote/TaxiBridge.kt',import.meta.url),'utf8'
+);
 const mainActivity=fs.readFileSync(
   new URL('../android/app/src/main/java/be/taxirecettes/copilote/MainActivity.kt',import.meta.url),'utf8'
 );
@@ -141,10 +145,16 @@ assert.match(driver,/if\(speed>180\)/);
 assert.match(driver,/supplementNuit:t\.supplementNuit, applyNight:night/);
 assert.match(patron,/_liveReqSeq/);
 assert.match(admin,/_liveReqSeq/);
-assert.match(meter,/max\(roundSaut\(total\), minimumCourse\)/);
-assert.match(meter,/MAX_PLAUSIBLE_SPEED_KMH/);
+assert.match(meter,/MeterMath\.finalPrice\(total, minimumCourse, saut\)/);
+assert.match(meter,/MeterMath\.increment/);
+assert.match(meterMath,/MAX_PLAUSIBLE_SPEED_KMH/);
+assert.match(meterMath,/fun finalPrice/);
 assert.match(meter,/optBoolean\("applyNight"/);
+assert.match(taxiBridge,/catch \(_: Exception\) \{\s*try \{ Meter\.stop\(\) \}[\s\S]*Meter\.clearSnapshot\(ctx\)/);
 assert.match(driver,/TaxiNative\.stopPositionPush/);
+assert.match(driver,/function dialogFocusable\(el\)/);
+assert.match(driver,/e\.key==='Escape'/);
+assert.match(driver,/openDialog\(ov,\(\)=>\$\('ppCancel'\)\)/);
 assert.match(fs.readFileSync(
   new URL('../android/app/src/main/java/be/taxirecettes/copilote/PositionPush.kt',import.meta.url),'utf8'
 ),/if \(!collecting\) clear\(ctx\)/);
@@ -157,6 +167,12 @@ assert.match(androidManifest,/android:allowBackup="false"/);
 assert.match(androidManifest,/android:usesCleartextTraffic="false"/);
 assert.match(androidGradle,/https:\/\/appassets\.androidplatform\.net\/assets\/webapp\/index\.html/);
 assert.doesNotMatch(admin,/prompt\('Nouveau mot de passe/);
+assert.match(patron,/\/rest\/v1\/rpc\/positions_live/);
+assert.match(admin,/\/rest\/v1\/rpc\/positions_live/);
+assert.doesNotMatch(patron,/recorded_at\.desc&limit=1000/);
+assert.doesNotMatch(admin,/recorded_at\.desc&limit=2000/);
+assert.match(admin,/else if\(r\.status>0 && !r\.ok\)/);
+assert.match(admin,/Réponse du serveur perdue/);
 assert.match(admin,/Mot de passe : 10 caractères minimum/);
 assert.match(patron,/Mot de passe : 10 caractères minimum/);
 assert.match(accountFunction,/password\.length < 10/);
@@ -169,8 +185,13 @@ console.log(JSON.stringify({
   moneyParity:true,
   moneyFunctionsExtracted:true,
   displayedTotalsMatch:true,
-  meterParity:true,
+  meterReferenceParity:true,
+  nativeMeterMathDelegated:true,
+  androidStartRollback:true,
   syncGuards:true,
+  modalFocusManaged:true,
+  liveMapUsesPerPlateRpc:true,
+  ambiguousCreatePreserved:true,
   uiSystem:true,
   androidWebViewIsolated:true
 },null,2));

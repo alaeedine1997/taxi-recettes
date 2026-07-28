@@ -80,4 +80,5 @@ dependencies {
     // 1.12.1 reste compatible avec AGP 8.5/compileSdk 34 tout en fournissant
     // WebViewAssetLoader. Les profils ART de 1.14 exigent une chaîne plus récente.
     implementation("androidx.webkit:webkit:1.12.1")
+    testImplementation("junit:junit:4.13.2")
 }

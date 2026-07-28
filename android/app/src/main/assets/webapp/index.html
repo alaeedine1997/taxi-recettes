@@ -573,7 +573,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     #welcomeScreen .wbtn.ghost{border-color:#33291B;color:#F0E9DC}
   }
 </style>
-<div id="welcomeScreen" role="dialog" aria-modal="true" aria-label="Bienvenue">
+<div id="welcomeScreen" role="dialog" aria-modal="true" aria-label="Bienvenue" tabindex="-1">
   <div class="wc">
     <div class="m"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
     <h1>Taxi Recettes</h1>
@@ -637,7 +637,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   .acc-role{font-size:12.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
 </style>
 
-<div id="authScreen" role="dialog" aria-modal="true" aria-label="Connexion">
+<div id="authScreen" role="dialog" aria-modal="true" aria-label="Connexion" tabindex="-1">
   <div class="auth-wrap">
     <div class="auth-head">
       <div class="auth-badge" aria-hidden="true">
@@ -669,7 +669,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   </div>
 </div>
 
-<div id="platePicker" role="dialog" aria-modal="true" aria-label="Choisir une plaque">
+<div id="platePicker" role="dialog" aria-modal="true" aria-label="Choisir une plaque" tabindex="-1">
   <div class="pp-wrap">
     <h2 class="pp-title">Prends ta plaque</h2>
     <p class="pp-sub">Choisis la plaque que tu conduis maintenant pour pouvoir démarrer.</p>
@@ -2462,6 +2462,9 @@ const carnet = (function(){
     const m=meta();
     m.localUpdatedAt=Math.max(Number(savedAt)||0,Number(db.syncUpdatedAt)||0,(m.lastSyncedAt||0)+1);
     db.syncUpdatedAt=m.localUpdatedAt;
+    /* Le marqueur monotone doit voyager AVEC le carnet. Si l'écriture séparée
+       de taxiSyncV1 échoue, un redémarrage voit quand même la course à pousser. */
+    writeLocal();
     setMeta(m);
     if(!auth.isLogged()) return;
     if(pushTimer) clearTimeout(pushTimer);
@@ -2732,7 +2735,7 @@ function renderPlate(){
 async function openPlatePicker(){
   const ov=$('platePicker'), list=$('ppList'), err=$('ppErr');
   err.textContent=''; list.innerHTML='<div class="pp-empty">Chargement…</div>';
-  ov.classList.add('show');
+  openDialog(ov,()=>$('ppCancel'));
   if(navigator.onLine){ await plates.resync(); if(plates.active()){    /* auto-guérison : cache restauré */
     const intent=pendingOpenDay, lab=plates.active().label;
     renderPlate(); closePlatePicker();
@@ -2754,7 +2757,7 @@ async function openPlatePicker(){
 }
 /* Filet unique : toute fermeture du sélecteur oublie l'intention en attente
    (sinon une prise de plaque ultérieure ouvrirait une journée par surprise). */
-function closePlatePicker(){ $('platePicker').classList.remove('show'); pendingOpenDay=null; }
+function closePlatePicker(){ closeDialog($('platePicker')); pendingOpenDay=null; }
 $('plateBar').addEventListener('click', e=>{
   if(e.target.closest('#plateTake')) openPlatePicker();
   if(e.target.closest('#plateRelease')){
@@ -2873,16 +2876,66 @@ const fleetCfg=(function(){
 })();
 
 function roleLabel(r){ return r==='superadmin'?'Super Admin':(r==='patron'?'Patron de flotte':(r==='chauffeur'?'Chauffeur':'—')); }
-function showAuth(on){ $('authScreen').classList.toggle('show', on!==false); if(on!==false) setTimeout(()=>$('authUser').focus(),60); }
-function hideAuth(){ $('authScreen').classList.remove('show'); }
+let activeDialog=null, dialogReturnFocus=null;
+function bgInert(on){ ['.skip-link','header.app','.wrap','nav.tabs'].forEach(sel=>{ const el=document.querySelector(sel); if(el) el.inert=!!on; }); }
+function dialogFocusable(el){
+  return Array.from(el.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+    .filter(node=>node.getClientRects().length>0);
+}
+function openDialog(el, initialFocus){
+  if(!el) return;
+  if(activeDialog && activeDialog!==el) activeDialog.classList.remove('show');
+  if(!dialogReturnFocus && document.activeElement && document.activeElement!==document.body
+    && !document.activeElement.closest('[role="dialog"]')) {
+    dialogReturnFocus=document.activeElement;
+  }
+  activeDialog=el;
+  el.classList.add('show');
+  bgInert(true);
+  setTimeout(()=>{
+    const target=typeof initialFocus==='function' ? initialFocus() : initialFocus;
+    const fallback=dialogFocusable(el)[0]||el;
+    try{ (target||fallback).focus(); }catch(_){ }
+  },60);
+}
+function closeDialog(el, restoreFocus){
+  if(!el) return;
+  el.classList.remove('show');
+  if(activeDialog!==el) return;
+  activeDialog=null;
+  bgInert(false);
+  if(restoreFocus!==false){
+    const target=dialogReturnFocus;
+    dialogReturnFocus=null;
+    if(target && document.contains(target)) setTimeout(()=>{ try{ target.focus(); }catch(_){ } },0);
+  }
+}
+document.addEventListener('keydown',e=>{
+  const modal=activeDialog;
+  if(!modal || !modal.classList.contains('show')) return;
+  if(e.key==='Escape'){
+    if(modal.id==='authScreen' && !$('authSubmit').disabled){ e.preventDefault(); enterGuest(); }
+    else if(modal.id==='platePicker'){ e.preventDefault(); closePlatePicker(); }
+    return;
+  }
+  if(e.key!=='Tab') return;
+  const items=dialogFocusable(modal);
+  if(!items.length){ e.preventDefault(); modal.focus(); return; }
+  const first=items[0], last=items[items.length-1], current=document.activeElement;
+  if(!modal.contains(current) || (!e.shiftKey && current===last) || (e.shiftKey && current===first)){
+    e.preventDefault();
+    (e.shiftKey?last:first).focus();
+  }
+});
+function showAuth(on){ if(on===false) closeDialog($('authScreen')); else openDialog($('authScreen'),()=>$('authUser')); }
+function hideAuth(){ closeDialog($('authScreen')); }
 function authError(msg){ const e=$('authErr'); if(msg){ e.textContent=msg; e.classList.add('show'); } else { e.classList.remove('show'); e.textContent=''; } }
 /* ---- Accueil : invité vs connexion ---- */
 const ENTRY_KEY='taxiEntryV1';
-function bgInert(on){ ['.wrap','nav.tabs'].forEach(sel=>{ const el=document.querySelector(sel); if(el) el.inert=!!on; }); }
-function showWelcome(){ const w=$('welcomeScreen'); bgInert(true); w.classList.add('show'); setTimeout(()=>{ const b=w.querySelector('button'); if(b){ try{ b.focus(); }catch(_){ } } },60); }
-function hideWelcome(){ $('welcomeScreen').classList.remove('show'); bgInert(false); }
+function showWelcome(){ const w=$('welcomeScreen'); openDialog(w,()=>w.querySelector('button')); }
+function hideWelcome(restoreFocus){ closeDialog($('welcomeScreen'),restoreFocus); }
 function enterGuest(){ try{ localStorage.setItem(ENTRY_KEY,'guest'); }catch(_){ } hideWelcome(); hideAuth(); renderAll(); }
-function openLogin(){ hideWelcome(); authError(''); $('authUser').value=''; $('authPass').value=''; showAuth(true); }
+function openLogin(){ hideWelcome(false); authError(''); $('authUser').value=''; $('authPass').value=''; showAuth(true); }
 $('wcGuest').addEventListener('click', enterGuest);
 $('wcLogin').addEventListener('click', openLogin);
 $('lockLogin').addEventListener('click', openLogin);

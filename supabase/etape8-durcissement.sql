@@ -15,7 +15,8 @@
 --  7. Une position impossible ou datée dans le futur pouvait polluer la carte.
 
 -- ---------------------------------------------------------------------------
--- 1) Les fonctions d'identité ignorent désormais les comptes désactivés.
+-- 1) Les fonctions d'identité ignorent désormais les comptes désactivés
+--    et les membres d'une flotte suspendue.
 --    Elles renvoient NULL => toutes les policies qui s'appuient dessus tombent.
 -- ---------------------------------------------------------------------------
 create or replace function public.my_fleet()
@@ -24,7 +25,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select fleet_id from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 create or replace function public.my_role_sd()
 returns text
@@ -32,7 +47,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select role::text from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 -- 5) anon reçoit EXECUTE par défaut chez Supabase : « from public » ne suffit pas.
 revoke all on function public.my_fleet()    from public, anon;
@@ -67,7 +96,8 @@ create policy positions_driver_insert on public.positions
   for insert
   to authenticated
   with check (
-    driver_id = auth.uid()
+    public.my_role_sd() = 'chauffeur'
+    and driver_id = auth.uid()
     and fleet_id = public.my_fleet()
     and lat between -90 and 90
     and lng between -180 and 180
@@ -168,7 +198,7 @@ as $$
             and p.fleet_id = public.my_fleet()
         )
       )
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 revoke all on function public.carnet_periode(uuid, date, date) from public, anon;
@@ -207,7 +237,7 @@ for each row execute function public.profile_lock_scope();
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
--- 1bis) my_role() : même correctif « compte actif ».
+-- 1bis) my_role() : même correctif « compte actif + flotte non suspendue ».
 --       PLACÉ EN DERNIER EXPRÈS : son corps d'origine n'est pas versionné ici.
 --       Si cette instruction échoue (type de retour différent), TOUT CE QUI
 --       PRÉCÈDE EST DÉJÀ APPLIQUÉ — il n'y a rien à refaire, signale-le moi.
@@ -218,7 +248,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select role::text from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 revoke all on function public.my_role() from public, anon;
 grant execute on function public.my_role() to authenticated;

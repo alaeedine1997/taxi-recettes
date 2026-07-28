@@ -49,8 +49,19 @@ returns text
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select role from public.profiles
-  where id = auth.uid() and active
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
 $$;
 
 create or replace function public.my_fleet()
@@ -58,8 +69,19 @@ returns uuid
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select fleet_id from public.profiles
-  where id = auth.uid() and active
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
 $$;
 
 revoke all on function public.my_role()  from public, anon;
@@ -73,6 +95,7 @@ create policy fleets_superadmin_all on public.fleets
   using (public.my_role() = 'superadmin')
   with check (public.my_role() = 'superadmin');
 
+drop policy if exists member_reads_own_fleet on public.fleets;
 drop policy if exists fleets_member_read on public.fleets;
 create policy fleets_member_read on public.fleets
   for select to authenticated
@@ -81,6 +104,7 @@ create policy fleets_member_read on public.fleets
     or (id = public.my_fleet() and not suspended)
   );
 
+drop policy if exists own_profile_read on public.profiles;
 drop policy if exists profiles_self_read on public.profiles;
 create policy profiles_self_read on public.profiles
   for select to authenticated
@@ -116,6 +140,7 @@ create policy profiles_patron_update_driver on public.profiles
     and fleet_id = public.my_fleet()
   );
 
+drop policy if exists own_carnet_all on public.carnets;
 drop policy if exists carnets_owner_all on public.carnets;
 create policy carnets_owner_all on public.carnets
   for all to authenticated

@@ -1,17 +1,18 @@
 # Audit complet et état de préparation — Taxi Recettes
 
-Date de clôture : 28 juillet 2026
+Date de clôture : 29 juillet 2026
 Branche : `agent/full-ui-ux-overhaul`
 
 ## Verdict
 
 Le code est désormais **compilable, testable et prêt pour une recette sur
 téléphones réels**. Il n'est pas encore raisonnable d'encaisser de l'argent réel
-tant que les trois actions de production suivantes ne sont pas terminées :
+tant que les quatre actions de production suivantes ne sont pas terminées :
 
 1. exécuter `supabase/INSTALLATION-COMPLETE.sql` sur le projet Supabase ;
 2. redéployer l'Edge Function `rapid-function` ;
-3. configurer une nouvelle clé de signature Android privée dans les secrets
+3. activer la protection Supabase Auth contre les mots de passe compromis ;
+4. configurer une nouvelle clé de signature Android privée dans les secrets
    GitHub, puis réussir la recette à deux téléphones de
    `MISE-EN-PRODUCTION.md`.
 
@@ -150,8 +151,8 @@ erDiagram
 - Le supplément Bruxelles présent dans la configuration n'était jamais ajouté.
 - **Correctif :** saut puis minimum, dans le même ordre web/Android ; supplément
   non-réservé appliqué entre 22 h et 6 h et persisté après kill Android.
-- **Preuve :** 50 000 configurations de compteur, aucun montant sous le minimum
-  et parité web/native.
+- **Preuve :** 50 000 configurations de référence côté Node et 50 000 cas JUnit
+  exécutant `MeterMath`, le calcul Kotlin réellement appelé par l'application.
 
 #### M6 — Saut GPS facturé comme une distance réelle
 
@@ -237,11 +238,57 @@ erDiagram
 #### M13 — Compte désactivé ou flotte suspendue encore exploitable
 
 - **Correctif :** `my_role`, `my_fleet`, `my_role_sd`, RLS et Edge Function
-  vérifient le statut actif et la suspension. Un patron suspendu ne crée plus de
-  chauffeur.
+  vérifient le statut actif et la suspension. Les lectures directes chauffeur
+  (positions, sessions clôturées et carnet) sont également fermées. Un patron
+  suspendu ne crée plus de chauffeur.
+- **Preuve :** avec des JWT encore valides, patron et chauffeur d'une flotte
+  suspendue obtiennent `NULL` des helpers, ne lisent plus les données métier et
+  ne peuvent plus prendre de plaque.
+
+#### M14 — Horodatages de session GPS forgeables
+
+- **Reproduction :** un chauffeur pouvait fournir un `started_at` ancien à la
+  prise de plaque, puis modifier le `ended_at` d'une session déjà clôturée.
+- **Risque :** élargir artificiellement la plage temporelle autorisée par la RLS
+  et injecter des positions dans un faux historique.
+- **Correctif :** le trigger impose les heures serveur à l'ouverture et à la
+  clôture ; une session clôturée devient immuable.
+- **Preuve :** tentative de session antidatée normalisée à l'heure serveur et
+  tentative de prolongation après clôture refusée.
+
+#### M15 — Anciennes policies conservées lors d'une mise à niveau
+
+- **Reproduction :** les policies historiques `own_carnet_all`,
+  `own_profile_read` et `member_reads_own_fleet` survivaient au script actuel,
+  car seules les nouvelles appellations étaient supprimées.
+- **Risque :** un compte désactivé ou membre d'une flotte suspendue conservait
+  l'accès accordé par l'ancienne policy la plus permissive.
+- **Correctif :** suppression explicite des trois noms historiques avant la
+  création des policies finales.
+- **Preuve :** le test installe le schéma, recrée les anciennes policies,
+  réinstalle le schéma et vérifie leur disparition.
+
+#### M16 — Patron capable d'usurper le rôle chauffeur
+
+- **Reproduction :** les policies d'insertion vérifiaient l'UUID, mais pas le
+  rôle. Un patron pouvait prendre une plaque pour lui-même puis envoyer du GPS.
+- **Correctif :** les écritures `plate_sessions` et `positions` exigent
+  désormais explicitement le rôle `chauffeur`.
+- **Preuve :** les deux requêtes forgées sont refusées par le test SQL
+  adversarial.
 
 ### Mineurs et robustesse
 
+- marqueur de synchronisation monotone réécrit avec le carnet avant la
+  métadonnée séparée ; une panne fractionnée reste récupérable au redémarrage ;
+- démarrage Android annulé et snapshot effacé si le service natif ne démarre
+  pas ;
+- carte live bornée à 40 points par plaque via `positions_live`, sans éviction
+  d'un véhicule retardé par les véhicules plus bavards ;
+- réponse perdue pendant la création flotte + patron traitée comme ambiguë :
+  aucune suppression destructive automatique ;
+- dialogues connexion/plaque réellement modaux : fond inert, focus piégé,
+  retour du focus et fermeture par `Escape` ;
 - réponses réseau obsolètes ignorées grâce à des numéros de requête ;
 - enregistrement des réglages bloqué si leur chargement a échoué ;
 - nouveaux mots de passe à dix caractères minimum, saisie masquée et détails
@@ -289,12 +336,14 @@ point au lieu d'afficher une fausse précision.
 | Test | Résultat |
 |---|---|
 | Syntaxe JavaScript de cinq pages, dont l'asset Android | OK |
+| Syntaxe TypeScript de l'Edge Function | OK |
 | Manifest PWA, service worker et icônes | OK |
 | Asset chauffeur Android identique à `index.html` | OK |
 | `rideNet` vs `cRideNet` patron/admin | 100 000 / 100 000 OK |
 | Somme des lignes vs total affiché | 10 000 / 10 000 OK |
-| Taximètre web/native | 50 000 / 50 000 OK |
+| Taximètre web + calcul Kotlin de production | 50 000 Node + 50 000 JUnit |
 | Deux téléphones + faux PostgREST | aucune course perdue |
+| Échec d'écriture de la métadonnée séparée | course repoussée après redémarrage |
 | Login hors-ligne puis retour réseau | fusion OK |
 | Quota plein | déconnexion bloquée, saisie conservée |
 | Suppression multi-appareil | pas de résurrection |
@@ -303,8 +352,13 @@ point au lieu d'afficher une fausse précision.
 | Isolation de deux flottes | OK |
 | Lecture anonyme locale | refusée |
 | Rôle/identité forgés | refusés |
+| Policies historiques lors d'une mise à niveau | supprimées |
+| Patron se déclarant chauffeur | session et GPS refusés |
+| Flotte suspendue avec JWT encore valide | lectures et prise de plaque refusées |
+| Horodatages de session GPS forgés | normalisés/refusés |
 | GPS impossible, futur ou hors session | refusé |
 | Rejeu GPS hors-ligne dans la session | accepté |
+| Carte live avec plaque retardée | présente, limite appliquée par plaque |
 | Trois APK debug, build propre | OK |
 | Trois APK release non signées, build propre | OK |
 | Android Lint Vital release | aucun problème |
@@ -317,7 +371,7 @@ Commandes reproductibles :
 npm ci
 npm test
 cd android
-gradle clean assembleDebug assembleRelease
+gradle clean testChauffeurDebugUnitTest assembleDebug assembleRelease
 ```
 
 Les APK release locales sont volontairement non signées. Le workflow GitHub

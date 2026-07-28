@@ -40,6 +40,9 @@ set username = excluded.username,
 
 Le mot de passe ne doit apparaître ni dans SQL ni dans le dépôt.
 
+Dans les réglages de sécurité de Supabase Auth, activer également la protection
+contre les mots de passe compromis avant de créer les comptes de production.
+
 ## 3. Déployer la gestion des comptes
 
 Suivre `supabase/DEPLOY.md` et déployer le code
@@ -75,9 +78,10 @@ publier si un secret manque ou si le keystore est invalide.
 
 Après validation de la Pull Request :
 
-- `.github/workflows/quality.yml` teste le JavaScript, 160 000 cas de calcul et
-  de totalisation, les scénarios hors-ligne multi-appareil, les migrations SQL
-  deux fois et les trois variantes Android debug ;
+- `.github/workflows/quality.yml` teste le JavaScript, 210 000 cas de calcul et
+  de totalisation dont 50 000 exécutés par le code Kotlin de production, les
+  scénarios hors-ligne multi-appareil, les migrations SQL deux fois et les
+  trois variantes Android debug ;
 - le merge sur `main` déclenche `.github/workflows/build-apk.yml` ;
 - la release GitHub `apk-latest` fournit
   `taxi-chauffeur.apk`, `taxi-patron.apk` et `taxi-admin.apk`.

@@ -219,13 +219,28 @@ phoneB.carnet.schedulePush(baseT-100_000);
 assertInvariant(phoneB,true);
 assert.ok(readMeta(phoneB).localUpdatedAt>readMeta(phoneB).lastSyncedAt);
 
+/* Si taxiSyncV1 refuse l'écriture, le marqueur reste dans le carnet lui-même.
+   Après redémarrage, la course doit donc encore partir vers le serveur. */
+const splitServer=new FakePostgrest(book([{id:'avant',amt:11}],baseT),baseT);
+const splitDevice=createDevice(splitServer,splitServer.row.data,sharedMeta);
+splitDevice.context.db.days[dateKey].rides.push({id:'stockage-fractionne',amt:17});
+splitDevice.storage.failKey=key=>key===SYNC_META;
+splitDevice.carnet.schedulePush(baseT-100_000);
+const persistedSplit=JSON.parse(splitDevice.storage.getItem(STORE_KEY));
+const persistedSplitMeta=readMeta(splitDevice);
+assert.ok(persistedSplit.syncUpdatedAt>persistedSplitMeta.lastSyncedAt);
+const restartedSplit=createDevice(splitServer,persistedSplit,persistedSplitMeta);
+assert.equal(await restartedSplit.carnet.flush(),true);
+assert.deepEqual(ids(splitServer.row.data),['avant','stockage-fractionne']);
+
 console.log(JSON.stringify({
   twoDevicesNoLoss:true,
   offlineLoginMerged:true,
   deletionNotResurrected:true,
   quotaLogoutBlocked:true,
   clockRollbackMonotone:true,
+  splitStorageFailureRecovered:true,
   invariantChecked:true,
   fakePostgrestRequests:
-    server.requests.length+loginServer.requests.length+deleteServer.requests.length
+    server.requests.length+loginServer.requests.length+deleteServer.requests.length+splitServer.requests.length
 },null,2));

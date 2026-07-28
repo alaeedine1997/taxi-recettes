@@ -58,8 +58,19 @@ returns text
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select role from public.profiles
-  where id = auth.uid() and active
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
 $$;
 
 create or replace function public.my_fleet()
@@ -67,8 +78,19 @@ returns uuid
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select fleet_id from public.profiles
-  where id = auth.uid() and active
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
 $$;
 
 revoke all on function public.my_role()  from public, anon;
@@ -82,6 +104,7 @@ create policy fleets_superadmin_all on public.fleets
   using (public.my_role() = 'superadmin')
   with check (public.my_role() = 'superadmin');
 
+drop policy if exists member_reads_own_fleet on public.fleets;
 drop policy if exists fleets_member_read on public.fleets;
 create policy fleets_member_read on public.fleets
   for select to authenticated
@@ -90,6 +113,7 @@ create policy fleets_member_read on public.fleets
     or (id = public.my_fleet() and not suspended)
   );
 
+drop policy if exists own_profile_read on public.profiles;
 drop policy if exists profiles_self_read on public.profiles;
 create policy profiles_self_read on public.profiles
   for select to authenticated
@@ -125,6 +149,7 @@ create policy profiles_patron_update_driver on public.profiles
     and fleet_id = public.my_fleet()
   );
 
+drop policy if exists own_carnet_all on public.carnets;
 drop policy if exists carnets_owner_all on public.carnets;
 create policy carnets_owner_all on public.carnets
   for all to authenticated
@@ -159,8 +184,22 @@ notify pgrst, 'reload schema';
 -- Helper : fleet_id du chauffeur/patron courant (security definer → contourne la RLS de profiles)
 create or replace function public.my_fleet()
 returns uuid
-language sql stable security definer set search_path = public
-as $$ select fleet_id from public.profiles where id = auth.uid() $$;
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 -- ---------------------------------------------------------------------
 --  Table des plaques (une plaque appartient à une flotte)
@@ -227,7 +266,8 @@ create policy psess_patron_read on public.plate_sessions
 drop policy if exists psess_driver_insert on public.plate_sessions;
 create policy psess_driver_insert on public.plate_sessions
   for insert with check (
-    driver_id = auth.uid()
+    public.my_role() = 'chauffeur'
+    and driver_id = auth.uid()
     and fleet_id = public.my_fleet()
     and exists (
       select 1 from public.plates p
@@ -248,32 +288,49 @@ create policy psess_patron_update on public.plate_sessions
   for update using (public.my_role() = 'patron' and fleet_id = public.my_fleet())
   with check (public.my_role() = 'patron' and fleet_id = public.my_fleet());
 
--- IMMUABILITÉ : sur une session, seul ended_at est modifiable (check-out). Empêche de réécrire
--- plate_id / driver_id / fleet_id / started_at par une requête PostgREST forgée (le WITH CHECK ne voit pas OLD).
+-- TEMPS SERVEUR + IMMUTABILITÉ : un client ne choisit ni started_at, ni la
+-- date de clôture. Une session clôturée ne peut plus être antidatée/prolongée
+-- pour élargir artificiellement la fenêtre d'insertion GPS.
 create or replace function public.plate_session_lock_cols()
 returns trigger language plpgsql as $$
 begin
+  if current_user in ('postgres', 'service_role', 'supabase_admin') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.started_at := now();
+    new.ended_at := null;
+    return new;
+  end if;
+
   if new.plate_id  is distinct from old.plate_id
   or new.driver_id is distinct from old.driver_id
   or new.fleet_id  is distinct from old.fleet_id
   or new.started_at is distinct from old.started_at then
     raise exception 'plate_sessions : seul ended_at est modifiable';
   end if;
-  -- ended_at est UNIDIRECTIONNEL : on peut clôturer (NULL→date) mais pas ré-ouvrir (date→NULL).
-  -- Sinon un chauffeur ressusciterait sa session close sur une plaque désactivée / annulerait une libération patron.
-  if old.ended_at is not null and new.ended_at is null then
-    raise exception 'plate_sessions : une session close ne peut pas être rouverte (reprends la plaque)';
+  if old.ended_at is not null and new.ended_at is distinct from old.ended_at then
+    raise exception 'plate_sessions : une session clôturée est immuable';
+  end if;
+  if old.ended_at is null and new.ended_at is not null then
+    new.ended_at := greatest(now(), old.started_at);
   end if;
   return new;
 end $$;
 drop trigger if exists plate_session_lock on public.plate_sessions;
-create trigger plate_session_lock before update on public.plate_sessions
+create trigger plate_session_lock before insert or update on public.plate_sessions
   for each row execute function public.plate_session_lock_cols();
 
 -- chauffeur : relit ses propres sessions
 drop policy if exists psess_driver_read on public.plate_sessions;
 create policy psess_driver_read on public.plate_sessions
-  for select using (driver_id = auth.uid());
+  for select
+  to authenticated
+  using (
+    driver_id = auth.uid()
+    and (ended_at is null or public.my_role() = 'chauffeur')
+  );
 
 -- =====================================================================
 --  (Optionnel) Jeu de test pour valider tout de suite :
@@ -312,6 +369,7 @@ alter table public.positions enable row level security;
 create index if not exists positions_fleet_time on public.positions (fleet_id, recorded_at desc);
 create index if not exists positions_plate_time on public.positions (plate_id, recorded_at desc);
 create index if not exists positions_driver_time on public.positions (driver_id, recorded_at desc);
+create index if not exists positions_recorded_at_desc on public.positions (recorded_at desc);
 
 -- superadmin : tout
 drop policy if exists positions_superadmin_all on public.positions;
@@ -324,7 +382,8 @@ create policy positions_superadmin_all on public.positions
 drop policy if exists positions_driver_insert on public.positions;
 create policy positions_driver_insert on public.positions
   for insert with check (
-    driver_id = auth.uid()
+    public.my_role() = 'chauffeur'
+    and driver_id = auth.uid()
     and fleet_id = public.my_fleet()
     and exists (
       select 1 from public.plate_sessions s
@@ -338,7 +397,9 @@ create policy positions_driver_insert on public.positions
 -- chauffeur : relit ses propres points (vie privée : il voit SA trace)
 drop policy if exists positions_driver_read on public.positions;
 create policy positions_driver_read on public.positions
-  for select using (driver_id = auth.uid());
+  for select
+  to authenticated
+  using (driver_id = auth.uid() and public.my_role() = 'chauffeur');
 
 -- patron : voit les positions de SA flotte UNIQUEMENT si l'option GPS/replay est débloquée
 --          ET la flotte non suspendue (contrôle d'abonnement + confidentialité au niveau base).
@@ -352,6 +413,81 @@ create policy positions_patron_read on public.positions
       where f.id = fleet_id and not f.suspended and (f.opt_gps_live or f.opt_replay)
     )
   );
+
+-- Carte live : retourne un nombre borné de points PAR plaque. Une limite
+-- globale évincerait les véhicules dont le dernier point est moins récent.
+create or replace function public.positions_live(
+  p_fleet uuid default null,
+  p_points integer default 40
+)
+returns table (
+  plate_id uuid,
+  fleet_id uuid,
+  driver_id uuid,
+  lat double precision,
+  lng double precision,
+  accuracy real,
+  recorded_at timestamptz,
+  plate_label text,
+  driver_name text
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with caller as materialized (
+    select public.my_role() as role, public.my_fleet() as fleet_id
+  ),
+  ranked as (
+    select
+      pos.*,
+      row_number() over (
+        partition by pos.plate_id
+        order by pos.recorded_at desc, pos.id desc
+      ) as point_rank
+    from public.positions pos
+    cross join caller c
+    where pos.plate_id is not null
+      and pos.recorded_at >= now() - interval '10 minutes'
+      and (
+        (
+          c.role = 'superadmin'
+          and (p_fleet is null or pos.fleet_id = p_fleet)
+        )
+        or (
+          c.role = 'patron'
+          and pos.fleet_id = c.fleet_id
+          and (p_fleet is null or p_fleet = c.fleet_id)
+          and exists (
+            select 1
+            from public.fleets f
+            where f.id = pos.fleet_id
+              and not f.suspended
+              and (f.opt_gps_live or f.opt_replay)
+          )
+        )
+      )
+  )
+  select
+    r.plate_id,
+    r.fleet_id,
+    r.driver_id,
+    r.lat,
+    r.lng,
+    r.accuracy,
+    r.recorded_at,
+    pl.label,
+    coalesce(nullif(pr.display_name, ''), pr.username)
+  from ranked r
+  join public.plates pl on pl.id = r.plate_id
+  left join public.profiles pr on pr.id = r.driver_id
+  where r.point_rank <= least(greatest(coalesce(p_points, 40), 1), 100)
+  order by r.recorded_at desc, r.plate_id
+$$;
+
+revoke all on function public.positions_live(uuid, integer) from public, anon;
+grant execute on function public.positions_live(uuid, integer) to authenticated;
 
 -- =====================================================================
 --  NOTE rétention (à faire plus tard, hors v0) : purger les vieux points
@@ -472,7 +608,21 @@ language sql
 stable
 security definer
 set search_path = public
-as $$ select role::text from public.profiles where id = auth.uid() $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 revoke all on function public.my_role_sd() from public;
 grant execute on function public.my_role_sd() to authenticated;
@@ -498,6 +648,11 @@ create policy profiles_patron_read on public.profiles
 --    (etape7-recette-periode.sql) qui s'en charge, et elle ne renvoie que la
 --    période demandée. On supprime la policy si un ancien passage l'avait créée.
 drop policy if exists carnets_patron_read on public.carnets;
+
+-- Vérification (doit lister les 2 policies + la fonction en security definer) :
+-- select tablename, policyname, cmd from pg_policies
+--   where policyname in ('profiles_patron_read','carnets_patron_read');
+-- select proname, prosecdef from pg_proc where proname in ('my_role','my_role_sd','my_fleet');
 
 
 -- ============================================================
@@ -525,6 +680,10 @@ create policy psess_member_read_active on public.plate_sessions
     and fleet_id is not null
     and fleet_id = public.my_fleet()
   );
+
+-- Vérification :
+-- select policyname, cmd from pg_policies
+--   where tablename='plate_sessions' and policyname='psess_member_read_active';
 
 
 -- ============================================================
@@ -599,7 +758,7 @@ as $$
         )
       )
       -- le chauffeur : son propre carnet
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 
@@ -648,7 +807,8 @@ notify pgrst, 'reload schema';
 --  7. Une position impossible ou datée dans le futur pouvait polluer la carte.
 
 -- ---------------------------------------------------------------------------
--- 1) Les fonctions d'identité ignorent désormais les comptes désactivés.
+-- 1) Les fonctions d'identité ignorent désormais les comptes désactivés
+--    et les membres d'une flotte suspendue.
 --    Elles renvoient NULL => toutes les policies qui s'appuient dessus tombent.
 -- ---------------------------------------------------------------------------
 create or replace function public.my_fleet()
@@ -657,7 +817,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select fleet_id from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 create or replace function public.my_role_sd()
 returns text
@@ -665,7 +839,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select role::text from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 -- 5) anon reçoit EXECUTE par défaut chez Supabase : « from public » ne suffit pas.
 revoke all on function public.my_fleet()    from public, anon;
@@ -700,7 +888,8 @@ create policy positions_driver_insert on public.positions
   for insert
   to authenticated
   with check (
-    driver_id = auth.uid()
+    public.my_role_sd() = 'chauffeur'
+    and driver_id = auth.uid()
     and fleet_id = public.my_fleet()
     and lat between -90 and 90
     and lng between -180 and 180
@@ -801,7 +990,7 @@ as $$
             and p.fleet_id = public.my_fleet()
         )
       )
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 revoke all on function public.carnet_periode(uuid, date, date) from public, anon;
@@ -840,7 +1029,7 @@ for each row execute function public.profile_lock_scope();
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
--- 1bis) my_role() : même correctif « compte actif ».
+-- 1bis) my_role() : même correctif « compte actif + flotte non suspendue ».
 --       PLACÉ EN DERNIER EXPRÈS : son corps d'origine n'est pas versionné ici.
 --       Si cette instruction échoue (type de retour différent), TOUT CE QUI
 --       PRÉCÈDE EST DÉJÀ APPLIQUÉ — il n'y a rien à refaire, signale-le moi.
@@ -851,7 +1040,21 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$ select role::text from public.profiles where id = auth.uid() and active $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 revoke all on function public.my_role() from public, anon;
 grant execute on function public.my_role() to authenticated;
@@ -968,13 +1171,16 @@ as $$
             and not f.suspended
         )
       )
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 revoke all on function public.carnet_periode(uuid, date, date) from public, anon;
 grant execute on function public.carnet_periode(uuid, date, date) to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- Vérification :
+-- select tgname from pg_trigger where tgrelid='public.plates'::regclass and not tgisinternal;
 
 
 -- ============================================================
@@ -1011,10 +1217,12 @@ revoke all on function public.my_role() from public, anon;
 revoke all on function public.my_fleet() from public, anon;
 revoke all on function public.my_role_sd() from public, anon;
 revoke all on function public.carnet_periode(uuid, date, date) from public, anon;
+revoke all on function public.positions_live(uuid, integer) from public, anon;
 
 grant execute on function public.my_role() to authenticated;
 grant execute on function public.my_fleet() to authenticated;
 grant execute on function public.my_role_sd() to authenticated;
 grant execute on function public.carnet_periode(uuid, date, date) to authenticated;
+grant execute on function public.positions_live(uuid, integer) to authenticated;
 
 notify pgrst, 'reload schema';

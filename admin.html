@@ -592,14 +592,21 @@ $('nfAdd').addEventListener('click', async ()=>{
   if(r.ok && d && d.ok){
     $('nfName').value='';$('nfPatron').value='';$('nfPass').value='';
     toast('Flotte « '+name+' » + patron « '+pu+' » créés'); loadFleets();
-  } else {
-    /* le patron a échoué → on annule la flotte pour ne pas laisser d'orpheline */
+  } else if(r.status>0 && !r.ok) {
+    /* Échec confirmé par le serveur : le patron n'existe pas, la flotte peut
+       être annulée. Un statut réseau 0 reste ambigu et suit la branche suivante. */
     await api('/rest/v1/fleets?id=eq.'+fleetId,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
     const e=d&&d.error;
     const map={identifiant_pris:'Cet identifiant patron est déjà pris.',mdp_court:'Mot de passe trop court.',username_invalide:'Identifiant patron invalide.'};
-    $('nfErr').textContent = (r.status===404||r.status===0)
+    $('nfErr').textContent = r.status===404
       ? 'La fonction « rapid-function » n\'est pas encore déployée — impossible de créer le patron (voir DEPLOY.md). Rien n\'a été créé.'
       : ('Patron non créé ('+(map[e]||e||r.status)+'). Rien n\'a été créé.');
+    loadFleets();
+  } else {
+    /* Réponse perdue ou illisible : supprimer la flotte ici détacherait un patron
+       que la fonction a peut-être déjà créé avec succès. On conserve l'ensemble
+       et on recharge pour permettre une vérification sans perte. */
+    $('nfErr').textContent='Réponse du serveur perdue. La flotte a été conservée : recharge la liste avant de réessayer.';
     loadFleets();
   }
 });
@@ -882,15 +889,16 @@ async function loadLive(){
   const isAll = IS_ADMIN_APP && !fid;   /* super-admin : toutes les flottes */
   if(!fid && !isAll) return;
   const requestedFleet=fid||'__all__', my=++_liveReqSeq;
-  const since=new Date(Date.now()-10*60000).toISOString();
-  const filter = isAll ? '' : '&fleet_id=eq.'+fid;
-  const r=await api('/rest/v1/positions?select=plate_id,fleet_id,lat,lng,accuracy,recorded_at,plates(label),profiles(username,display_name)&recorded_at=gte.'+since+filter+'&order=recorded_at.desc&limit=2000');
+  const r=await api('/rest/v1/rpc/positions_live',{
+    method:'POST',
+    body:JSON.stringify({p_fleet:isAll?null:fid,p_points:40})
+  });
   if(my!==_liveReqSeq || requestedFleet!==(currentMapFleet()||'__all__')) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
   const seen=new Set(), pts=[], cards=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
-    const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
+    const nm=p.plate_label||'?', drv=p.driver_name||'';
     const flLine = isAll ? '<br><span style="color:#888">'+esc(fleetName(p.fleet_id)||'')+'</span>' : '';
     const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
     const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+flLine+

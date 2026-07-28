@@ -2,12 +2,6 @@ package be.taxirecettes.copilote
 
 import android.content.Context
 import org.json.JSONObject
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Cœur du taximètre. C'est un singleton partagé entre le service natif (GPS en
@@ -21,7 +15,6 @@ import kotlin.math.sqrt
 object Meter {
 
     @Volatile var running = false
-    private const val MAX_PLAUSIBLE_SPEED_KMH = 180.0
 
     // tarifs (repli sur les valeurs Bruxelles si absent)
     private var priseEnCharge = 2.60
@@ -70,15 +63,6 @@ object Meter {
         running = true
     }
 
-    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) +
-            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
-        return 2 * r * asin(sqrt(a))
-    }
-
     @Synchronized
     fun onLocation(lat: Double, lon: Double, t: Long, accuracy: Float) {
         if (!running) return
@@ -86,26 +70,25 @@ object Meter {
         if (hasLast) {
             val dt = (t - lastT) / 1000.0
             if (dt > 0) {
-                var dd = haversine(lastLat, lastLon, lat, lon)
-                val speed = (dd / dt) * 3.6
-                if (speed > MAX_PLAUSIBLE_SPEED_KMH) return       // saut GPS : ne pas facturer
-                if (speed < vitesseMinRoule) dd = 0.0             // à l'arrêt : anti-dérive GPS
-                distanceM += dd
-                val compKm = tarifKm * (dd / 1000.0)
-                val compMin = tarifMinute * (dt / 60.0)
-                total += max(compKm, compMin)
-                tarifNow = if (compMin > compKm) "temps" else "km"
+                val increment = MeterMath.increment(
+                    lastLat, lastLon, lat, lon, dt,
+                    tarifKm, tarifMinute, vitesseMinRoule
+                )
+                if (!increment.accepted) return
+                distanceM += increment.distanceM
+                total += increment.charge
+                tarifNow = increment.tariff
             }
         }
         lastLat = lat; lastLon = lon; lastT = t; hasLast = true
     }
 
-    private fun roundSaut(p: Double): Double = Math.round(Math.round(p / saut) * saut * 100.0) / 100.0
+    private fun roundSaut(p: Double): Double = MeterMath.roundJump(p, saut)
 
     fun livePrice(): Double = roundSaut(total)
     /* Même ordre que le web : saut d'abord, minimum ensuite. Arrondir le minimum
        au saut pouvait faire repasser le montant final sous le minimum configuré. */
-    private fun finalPrice(): Double = Math.round(max(roundSaut(total), minimumCourse) * 100.0) / 100.0
+    private fun finalPrice(): Double = MeterMath.finalPrice(total, minimumCourse, saut)
     fun km(): Double = Math.round(distanceM / 10.0) / 100.0
     fun seconds(): Long = if (startAt == 0L) 0 else (System.currentTimeMillis() - startAt) / 1000
 

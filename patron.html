@@ -690,14 +690,16 @@ function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null;
 async function loadLive(){
   const fid=currentMapFleet(); if(!fid || !_map) return;
   const my=++_liveReqSeq;
-  const since=new Date(Date.now()-10*60000).toISOString();
-  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,accuracy,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
+  const r=await api('/rest/v1/rpc/positions_live',{
+    method:'POST',
+    body:JSON.stringify({p_fleet:fid,p_points:40})
+  });
   if(my!==_liveReqSeq || fid!==currentMapFleet()) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
   const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
   const seen=new Set(), pts=[], cards=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
-    const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
+    const nm=p.plate_label||'?', drv=p.driver_name||'';
     const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
     const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+
       '<br><span style="color:#557070">'+(delayed?'Dernière position · il y a '+Math.round(ageSec/60)+' min':'Direct · il y a '+ageSec+' s')+
