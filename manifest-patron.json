@@ -1,15 +1,15 @@
 {
-  "id": "./index.html",
-  "name": "Taxi Recettes",
-  "short_name": "Taxi Recettes",
-  "description": "Gestion des recettes, des chauffeurs et du suivi de flotte de taxi.",
+  "id": "./patron.html",
+  "name": "Taxi Recettes Patron",
+  "short_name": "Taxi Patron",
+  "description": "Recettes, chauffeurs, plaques et suivi GPS de la flotte.",
   "lang": "fr-BE",
-  "start_url": "./index.html",
+  "start_url": "./patron.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#F4F6F9",
-  "theme_color": "#0F172A",
+  "orientation": "any",
+  "background_color": "#FAF5EC",
+  "theme_color": "#123B73",
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {

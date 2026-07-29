@@ -1,7 +1,9 @@
-const CACHE = 'taxi-recettes-shell-v2-final-ui';
+const CACHE = 'taxi-recettes-shell-v3-ios-patron';
 const CORE = [
   './',
   './index.html',
+  './patron.html',
+  './manifest-patron.json',
   './ui-system.css?v=2',
   './manifest.json',
   './icons/taxi-192.png',

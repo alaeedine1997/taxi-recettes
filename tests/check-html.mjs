@@ -30,12 +30,32 @@ if(rootCss!==embeddedCss) throw new Error('CSS Android désynchronisé');
 
 const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
-if(!sw.includes('taxi-recettes-shell-v2-final-ui')) throw new Error('cache PWA du nouveau design non versionné');
+if(!sw.includes('taxi-recettes-shell-v3-ios-patron')) throw new Error('cache PWA iPhone non versionné');
+if(!sw.includes("'./patron.html'")) throw new Error('espace patron absent du cache PWA');
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.json',import.meta.url),'utf8'));
 if(!Array.isArray(manifest.icons)||manifest.icons.length<2) throw new Error('icônes PWA manquantes');
 if(manifest.theme_color!=='#0F172A') throw new Error('couleur PWA non alignée sur le design final');
 for(const icon of manifest.icons){
   if(!fs.existsSync(new URL('../'+icon.src,import.meta.url))) throw new Error(`icône absente : ${icon.src}`);
+}
+const patronPwa=fs.readFileSync(new URL('../patron.html',import.meta.url),'utf8');
+for(const marker of [
+  'apple-mobile-web-app-capable',
+  'href="manifest-patron.json"',
+  'rel="apple-touch-icon"',
+  "serviceWorker.register('./sw.js')"
+]){
+  if(!patronPwa.includes(marker)) throw new Error(`PWA patron incomplète : ${marker}`);
+}
+const patronManifest=JSON.parse(
+  fs.readFileSync(new URL('../manifest-patron.json',import.meta.url),'utf8')
+);
+if(patronManifest.id!=='./patron.html'||patronManifest.start_url!=='./patron.html'){
+  throw new Error('le PWA patron ne démarre pas sur son propre espace');
+}
+if(patronManifest.display!=='standalone') throw new Error('le PWA patron ne démarre pas comme une app');
+for(const icon of patronManifest.icons||[]){
+  if(!fs.existsSync(new URL('../'+icon.src,import.meta.url))) throw new Error(`icône patron absente : ${icon.src}`);
 }
 for(const selector of ['body.app-driver','body.app-manager','body.app-admin','prefers-reduced-motion']){
   if(!rootCss.includes(selector)) throw new Error(`règle UI finale absente : ${selector}`);
