@@ -16,7 +16,8 @@ const sqlSources=[
   'etape7-recette-periode.sql',
   'etape8-durcissement.sql',
   'etape9-quotas.sql',
-  'etape10-grants.sql'
+  'etape10-grants.sql',
+  'etape11-advisors.sql'
 ];
 for(const file of sqlSources){
   const source=normalizeSql(fs.readFileSync(new URL(`../supabase/${file}`,import.meta.url),'utf8'));
@@ -51,6 +52,12 @@ for(let pass=1;pass<=2;pass++){
         for all to authenticated
         using (user_id = auth.uid())
         with check (user_id = auth.uid());
+      create policy superadmin_all_fleets on public.fleets
+        for all using (public.my_role() = 'superadmin')
+        with check (public.my_role() = 'superadmin');
+      create policy superadmin_all_profiles on public.profiles
+        for all using (public.my_role() = 'superadmin')
+        with check (public.my_role() = 'superadmin');
     `);
   }
 }
@@ -73,7 +80,25 @@ const rls=await db.query(`
 const legacyPolicies=await db.query(`
   select policyname from pg_policies
   where schemaname='public'
-    and policyname in ('member_reads_own_fleet','own_profile_read','own_carnet_all')
+    and policyname in (
+      'member_reads_own_fleet','own_profile_read','own_carnet_all',
+      'superadmin_all_fleets','superadmin_all_profiles'
+    )
+`);
+const publicTargetPolicies=await db.query(`
+  select policyname from pg_policies
+  where schemaname='public' and 'public' = any(roles)
+`);
+const triggerFunctionHardening=await db.query(`
+  select
+    proname,
+    coalesce(array_to_string(proconfig, ','),'') as config,
+    has_function_privilege('anon', oid, 'EXECUTE') as anon_execute,
+    has_function_privilege('authenticated', oid, 'EXECUTE') as authenticated_execute
+  from pg_proc
+  where pronamespace='public'::regnamespace
+    and proname in ('plate_session_lock_cols','profile_lock_scope','plates_enforce_max')
+  order by proname
 `);
 
 if(tables.rows.length<7) throw new Error('tables manquantes');
@@ -81,6 +106,14 @@ if(Number(policies.rows[0].n)<15) throw new Error('policies manquantes');
 if(functions.rows.length!==6 || functions.rows.some(x=>!x.prosecdef)) throw new Error('fonctions privilégiées incorrectes');
 if(rls.rows.length!==7 || rls.rows.some(x=>!x.relrowsecurity)) throw new Error('RLS manquante');
 if(legacyPolicies.rows.length) throw new Error('anciennes policies permissives encore actives');
+if(publicTargetPolicies.rows.length) throw new Error('policy applicative encore ciblée sur public');
+if(
+  triggerFunctionHardening.rows.length!==3
+  || triggerFunctionHardening.rows.some(x=>x.anon_execute || x.authenticated_execute)
+  || !triggerFunctionHardening.rows
+    .find(x=>x.proname==='plate_session_lock_cols')
+    ?.config.includes('search_path=public, pg_temp')
+) throw new Error('fonctions trigger insuffisamment protégées');
 
 const ids={
   fa:'00000000-0000-0000-0000-00000000000a',
@@ -297,6 +330,9 @@ console.log(JSON.stringify({
   roleEscalationDenied:true,
   profileScopeLocked:true,
   legacyPoliciesRemoved:true,
+  policiesAuthenticatedOnly:true,
+  triggerFunctionsHardened:true,
+  authUidInitPlanOptimized:true,
   driverRoleEnforced:true,
   gpsInputValidated:true,
   liveMapPerPlate:true,

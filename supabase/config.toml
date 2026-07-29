@@ -1,0 +1,4 @@
+project_id = "taxi-recettes"
+
+[functions.rapid-function]
+verify_jwt = true

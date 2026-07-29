@@ -26,10 +26,12 @@ de bord appellent :
 POST /functions/v1/rapid-function
 ```
 
-Conserver la vérification JWT de la passerelle activée. Le navigateur envoie la
-clé publique `sb_publishable_…` dans `apikey` et le JWT de session dans
-`Authorization`. La fonction revérifie ensuite ce JWT avec `auth.getUser()`,
-puis le rôle, l’état actif et la flotte dans `profiles`.
+Conserver la vérification JWT de la passerelle activée. Le fichier
+`supabase/config.toml` fixe explicitement `verify_jwt = true` pour empêcher une
+régression lors des prochains déploiements. Le navigateur envoie la clé publique
+`sb_publishable_…` dans `apikey` et le JWT de session dans `Authorization`. La
+fonction revérifie ensuite ce JWT avec `auth.getUser()`, puis le rôle, l’état
+actif et la flotte dans `profiles`.
 
 ## Depuis le Dashboard
 
