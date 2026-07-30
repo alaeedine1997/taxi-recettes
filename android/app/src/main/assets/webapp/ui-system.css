@@ -1099,6 +1099,30 @@ body.app-admin .settle.owe{
   color:#713f12;
   background:#fff8df!important;
 }
+body.app-manager .settle.pending,
+body.app-admin .settle.pending{
+  border-color:#aab7c4!important;
+  color:#344054;
+  background:#f8fafc!important;
+}
+body.app-manager .settle.pending .big,
+body.app-admin .settle.pending .big{font-size:18px!important}
+body.app-manager .holding-summary,
+body.app-admin .holding-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 18px;
+  margin:8px 0 4px;
+  font-size:13px;
+  line-height:1.45;
+}
+body.app-manager .holding-summary strong,
+body.app-admin .holding-summary strong{font-variant-numeric:tabular-nums}
+body.app-manager .settlement-holders input[aria-invalid="true"],
+body.app-admin .settlement-holders input[aria-invalid="true"]{
+  border-color:var(--danger)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 16%,transparent)!important;
+}
 body.app-manager table th,
 body.app-admin table th{
   position:sticky;
@@ -1591,6 +1615,8 @@ body.app-admin #map{
   body.app-admin .settle{color:#bbf7d0;background:#11351f!important}
   body.app-manager .settle.owe,
   body.app-admin .settle.owe{color:#fde68a;background:#372c0c!important}
+  body.app-manager .settle.pending,
+  body.app-admin .settle.pending{color:#e5e7eb;background:#1f2937!important}
 }
 
 @media(prefers-reduced-motion:reduce){

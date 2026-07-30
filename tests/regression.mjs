@@ -69,6 +69,74 @@ const driverCtx=compile(
 );
 const patronCtx=compile(patron,['cSrcAppCash','cRateOf','cRideNet'],'cRideNet');
 const adminCtx=compile(admin,['cSrcAppCash','cRateOf','cRideNet'],'cRideNet');
+const patronSettlementCtx=compile(
+  patron,
+  ['cRideOnboard','cSettlement'],
+  '({cRideOnboard,cSettlement})'
+);
+const adminSettlementCtx=compile(
+  admin,
+  ['cRideOnboard','cSettlement'],
+  '({cRideOnboard,cSettlement})'
+);
+let moneyInputValue='';
+const moneyInputExtra={$:()=>({value:moneyInputValue})};
+const patronMoneyInputCtx=compile(patron,['cMoneyInput'],'cMoneyInput',moneyInputExtra);
+const adminMoneyInputCtx=compile(admin,['cMoneyInput'],'cMoneyInput',moneyInputExtra);
+
+const moneyInputCases=[
+  ['',null],
+  ['0',0],
+  ['0,00',0],
+  ['125,50',125.5],
+  ['1.234,56',1234.56],
+  ['1.000',1000],
+  ['12.5',12.5],
+  ['-1',NaN],
+  ['montant',NaN]
+];
+for(const [input,expected] of moneyInputCases){
+  moneyInputValue=input;
+  for(const ctx of [patronMoneyInputCtx,adminMoneyInputCtx]){
+    const actual=ctx.__tested('amount');
+    if(Number.isNaN(expected)) assert.ok(Number.isNaN(actual));
+    else assert.equal(actual,expected);
+  }
+}
+
+const onboardCases=[
+  [{amt:100,pay:'cash',rate:40},100],
+  [{amt:100,pay:'sumup',rate:40},100],
+  [{amt:100,pay:'cheque',rate:40},100],
+  [{amt:100,pay:'app'},0],
+  [{amt:100,pay:'appcash',cash:37.25},37.25],
+  [{amt:100,pay:'appcash',cash:-20},0],
+  [{amt:100,pay:'appcash',cash:140},100]
+];
+for(const [ride,expected] of onboardCases){
+  assert.equal(patronSettlementCtx.__tested.cRideOnboard(ride),expected);
+  assert.equal(adminSettlementCtx.__tested.cRideOnboard(ride),expected);
+}
+
+const settlementCases=[
+  {input:[1000,300,100,400],valid:true,patronHeld:400,chauffeurCash:600,balance:200},
+  {input:[1000,600,100,700],valid:true,patronHeld:700,chauffeurCash:300,balance:-400},
+  /* 100 € cash avec 20 % de commission : 80 € nets, part chauffeur 48 €.
+     Le chauffeur détient bien 100 € bruts et reverse donc 52 € au patron. */
+  {input:[100,0,0,48],valid:true,patronHeld:0,chauffeurCash:100,balance:52},
+  {input:[100,100,0,48],valid:true,patronHeld:100,chauffeurCash:0,balance:-48},
+  {input:[123.45,12.34,11.11,60],valid:true,patronHeld:23.45,chauffeurCash:100,balance:40},
+  {input:[100,80,30,40],valid:false,patronHeld:110,chauffeurCash:-10,balance:null}
+];
+for(const expected of settlementCases){
+  for(const ctx of [patronSettlementCtx,adminSettlementCtx]){
+    const actual=ctx.__tested.cSettlement(...expected.input);
+    assert.equal(actual.valid,expected.valid);
+    assert.equal(actual.patronHeld,expected.patronHeld);
+    assert.equal(actual.chauffeurCash,expected.chauffeurCash);
+    assert.equal(actual.balance,expected.balance);
+  }
+}
 
 let seed=0x5eed1234;
 const rnd=()=>((seed=(seed*1664525+1013904223)>>>0)/0x100000000);
@@ -137,6 +205,13 @@ assert.match(patron,/class="app-manager"/);
 assert.match(patron,/id="managerHero"/);
 assert.match(admin,/class="app-admin"/);
 assert.match(admin,/id="adminHero"/);
+for(const html of [patron,admin]){
+  assert.match(html,/id="cSumup"/);
+  assert.match(html,/id="cTaxiCheque"/);
+  assert.match(html,/function cRideOnboard\(/);
+  assert.match(html,/function cSettlement\(/);
+  assert.doesNotMatch(html,/id="cKeepCash"/);
+}
 assert.match(driver,/deletedRideIds/);
 assert.match(driver,/fieldUpdatedAt/);
 assert.match(driver,/syncUpdatedAt/);
@@ -180,6 +255,8 @@ assert.doesNotMatch(accountFunction,/detail:\s*(?:String\(|error\.message|pErr\.
 
 console.log(JSON.stringify({
   moneyCases:100000,
+  moneyInputCases:moneyInputCases.length,
+  settlementCases:settlementCases.length,
   displayedTotalGroups:displayedGroups,
   meterCases:50000,
   moneyParity:true,

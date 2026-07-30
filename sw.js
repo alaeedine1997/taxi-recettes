@@ -1,10 +1,10 @@
-const CACHE = 'taxi-recettes-shell-v3-ios-patron';
+const CACHE = 'taxi-recettes-shell-v4-settlement';
 const CORE = [
   './',
   './index.html',
   './patron.html',
   './manifest-patron.json',
-  './ui-system.css?v=2',
+  './ui-system.css?v=3',
   './manifest.json',
   './icons/taxi-192.png',
   './icons/taxi-512.png'
