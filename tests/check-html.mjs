@@ -30,7 +30,7 @@ if(rootCss!==embeddedCss) throw new Error('CSS Android désynchronisé');
 
 const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
-if(!sw.includes('taxi-recettes-shell-v4-settlement')) throw new Error('cache PWA iPhone non versionné');
+if(!sw.includes('taxi-recettes-shell-v5-feature-access')) throw new Error('cache PWA iPhone non versionné');
 if(!sw.includes("'./patron.html'")) throw new Error('espace patron absent du cache PWA');
 const manifest=JSON.parse(fs.readFileSync(new URL('../manifest.json',import.meta.url),'utf8'));
 if(!Array.isArray(manifest.icons)||manifest.icons.length<2) throw new Error('icônes PWA manquantes');

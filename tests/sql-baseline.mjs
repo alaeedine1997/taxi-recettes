@@ -159,6 +159,32 @@ if(patronPositions.rows.length!==1 || patronPositions.rows[0].driver_id!==ids.da
 if(patronOtherCarnet.rows[0].data!==null) throw new Error('fuite carnet inter-flotte');
 
 await db.exec('reset role');
+await db.exec(`update public.fleets set opt_recettes=false where id='${ids.fa}'`);
+await db.exec(`select set_config('request.jwt.claim.sub','${ids.pa}',false); set role authenticated;`);
+const disabledRecettes=await db.query(`
+  select public.carnet_periode('${ids.da}','2026-07-01','2026-07-31') as data
+`);
+if(disabledRecettes.rows[0].data!==null) throw new Error('recettes encore visibles après retrait de l\'option');
+
+await db.exec('reset role');
+await db.exec(`
+  update public.fleets
+  set opt_recettes=true,opt_gps_live=false,opt_replay=false
+  where id='${ids.fa}'
+`);
+await db.exec(`select set_config('request.jwt.claim.sub','${ids.pa}',false); set role authenticated;`);
+const disabledGpsRows=await db.query(`select id from public.positions`);
+const disabledGpsRpc=await db.query(`select plate_id from public.positions_live('${ids.fa}',3)`);
+if(disabledGpsRows.rows.length!==0 || disabledGpsRpc.rows.length!==0) {
+  throw new Error('positions encore visibles après retrait des options GPS');
+}
+
+await db.exec('reset role');
+await db.exec(`
+  update public.fleets
+  set opt_gps_live=true,opt_replay=true
+  where id='${ids.fa}'
+`);
 await db.exec(`
   insert into public.positions(driver_id,fleet_id,plate_id,lat,lng,recorded_at)
   select '${ids.da}','${ids.fa}','${ids.pla}',50.85,4.35,now()-(n||' seconds')::interval
@@ -336,6 +362,7 @@ console.log(JSON.stringify({
   driverRoleEnforced:true,
   gpsInputValidated:true,
   liveMapPerPlate:true,
+  fleetOptionsEnforced:true,
   offlineGpsReplay:true,
   sessionTimesLocked:true,
   suspendedFleetDenied:true

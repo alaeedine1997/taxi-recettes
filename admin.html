@@ -554,15 +554,35 @@ async function loadFleets(){
   }).join('');
 }
 async function patchFleet(id, patch, errId){
-  const r=await api('/rest/v1/fleets?id=eq.'+id,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(patch)});
-  if(!r.ok){ const e=document.querySelector('[data-ferr="'+id+'"]'); if(e) e.textContent='Échec de l\'enregistrement.'; return false; }
-  return true;
+  const fields='id,name,max_plates,suspended,opt_gps_live,opt_replay,opt_recettes';
+  const r=await api('/rest/v1/fleets?id=eq.'+encodeURIComponent(id)+'&select='+fields,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify(patch)});
+  if(!r.ok || !Array.isArray(r.data) || !r.data.length){
+    const e=document.querySelector('[data-ferr="'+id+'"]'); if(e) e.textContent='Échec de l\'enregistrement.';
+    return null;
+  }
+  const saved=r.data[0], cached=_fleetsCache.find(f=>f.id===id);
+  if(cached) Object.assign(cached,saved);
+  return saved;
 }
 $('fleetsList').addEventListener('change', async e=>{
   const cb=e.target.closest('[data-opt]');
-  if(cb){ if(await patchFleet(cb.dataset.fleet, {[cb.dataset.opt]:cb.checked})) toast('Enregistré'); return; }
+  if(cb){
+    const previous=!cb.checked; cb.disabled=true;
+    const saved=await patchFleet(cb.dataset.fleet,{[cb.dataset.opt]:cb.checked});
+    cb.disabled=false;
+    if(saved){
+      if(currentFleet()===cb.dataset.fleet){ refreshCurrentFleetAccess(); setupMapCard(); if(cb.dataset.opt==='opt_recettes') resetCalc(); }
+      toast('Enregistré');
+    } else cb.checked=previous;
+    return;
+  }
   const mx=e.target.closest('[data-max]');
-  if(mx){ const v=Math.max(0, parseInt(mx.value,10)||0); mx.value=v; if(await patchFleet(mx.dataset.max, {max_plates:v})) toast('Plaques max : '+v); }
+  if(mx){
+    const before=(_fleetsCache.find(f=>f.id===mx.dataset.max)||{}).max_plates||0;
+    const v=Math.max(0,parseInt(mx.value,10)||0); mx.value=v; mx.disabled=true;
+    const saved=await patchFleet(mx.dataset.max,{max_plates:v}); mx.disabled=false;
+    if(saved) toast('Plaques max : '+saved.max_plates); else mx.value=before;
+  }
 });
 $('fleetsList').addEventListener('click', async e=>{
   const d=e.target.closest('[data-fdetail]');
@@ -1150,13 +1170,17 @@ function fillFleetBar(){
   if(prev && (_fleetsCache||[]).some(f=>f.id===prev)) $('fbFleet').value=prev;
   onFleetChange(true);
 }
-function onFleetChange(silencieux){
+function refreshCurrentFleetAccess(){
   const fid=currentFleet();
   const f=(_fleetsCache||[]).find(x=>x.id===fid)||null;
   setAllowed('platesCard', !!f);
   setAllowed('cfgCard',    !!f);
   setAllowed('calcCard',   !!(f && !f.suspended && f.opt_recettes));   /* Recettes = option debloquee */
   setAllowed('mapCard',    !!(f && !f.suspended && (f.opt_gps_live||f.opt_replay)));
+  return f;
+}
+function onFleetChange(silencieux){
+  const f=refreshCurrentFleetAccess();
   if(!f) return;
   /* on efface l'ancienne fiche AVANT fillChaufList : sinon _sheet contient encore
      la fiche de l'ancienne flotte et l'auto-chargement du 1er chauffeur est sauté */

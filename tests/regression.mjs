@@ -30,8 +30,9 @@ function referenceNet(amount,rate,pay='cash',appCash=false){
 }
 
 function extractFunction(source,name){
-  const start=source.indexOf(`function ${name}(`);
+  let start=source.indexOf(`function ${name}(`);
   if(start<0) throw new Error(`fonction ${name} introuvable`);
+  if(source.slice(start-6,start)==='async ') start-=6;
   const open=source.indexOf('{',start);
   let depth=0, quote='', lineComment=false, blockComment=false, escaped=false;
   for(let i=open;i<source.length;i++){
@@ -83,6 +84,43 @@ let moneyInputValue='';
 const moneyInputExtra={$:()=>({value:moneyInputValue})};
 const patronMoneyInputCtx=compile(patron,['cMoneyInput'],'cMoneyInput',moneyInputExtra);
 const adminMoneyInputCtx=compile(admin,['cMoneyInput'],'cMoneyInput',moneyInputExtra);
+const patronFeaturesCtx=compile(
+  patron,
+  ['fleetFeatures','patronSectionAllowed'],
+  '({fleetFeatures,patronSectionAllowed})'
+);
+
+const featureCases=[
+  [null,{recettes:false,gpsLive:false,replay:false,carte:false}],
+  [{opt_recettes:true,opt_gps_live:true,opt_replay:true,suspended:false},{recettes:true,gpsLive:true,replay:true,carte:true}],
+  [{opt_recettes:false,opt_gps_live:false,opt_replay:true,suspended:false},{recettes:false,gpsLive:false,replay:true,carte:true}],
+  [{opt_recettes:true,opt_gps_live:true,opt_replay:false,suspended:true},{recettes:false,gpsLive:false,replay:false,carte:false}]
+];
+for(const [fleet,expected] of featureCases){
+  const actual=patronFeaturesCtx.__tested.fleetFeatures(fleet);
+  assert.deepEqual(JSON.parse(JSON.stringify(actual)),expected);
+  assert.equal(patronFeaturesCtx.__tested.patronSectionAllowed('recettes',actual),expected.recettes);
+  assert.equal(patronFeaturesCtx.__tested.patronSectionAllowed('carte',actual),expected.carte);
+  assert.equal(patronFeaturesCtx.__tested.patronSectionAllowed('reglages',actual),true);
+}
+
+let patchResponse={ok:true,data:[{id:'fleet-a',opt_recettes:false,max_plates:4}]};
+let patchRequest=null;
+const adminFleetCache=[{id:'fleet-a',opt_recettes:true,max_plates:2}];
+const fleetError={textContent:''};
+const adminPatchCtx=compile(admin,['patchFleet'],'patchFleet',{
+  _fleetsCache:adminFleetCache,
+  document:{querySelector:()=>fleetError},
+  api:async(path,options)=>{ patchRequest={path,options}; return patchResponse; }
+});
+const savedFleet=await adminPatchCtx.__tested('fleet-a',{opt_recettes:false});
+assert.equal(savedFleet.opt_recettes,false);
+assert.equal(adminFleetCache[0].opt_recettes,false);
+assert.match(patchRequest.path,/select=id,name,max_plates,suspended,opt_gps_live,opt_replay,opt_recettes/);
+assert.equal(patchRequest.options.headers.Prefer,'return=representation');
+patchResponse={ok:true,data:[]};
+assert.equal(await adminPatchCtx.__tested('fleet-a',{opt_recettes:true}),null);
+assert.equal(fleetError.textContent,'Échec de l\'enregistrement.');
 
 const moneyInputCases=[
   ['',null],
@@ -205,6 +243,11 @@ assert.match(patron,/class="app-manager"/);
 assert.match(patron,/id="managerHero"/);
 assert.match(admin,/class="app-admin"/);
 assert.match(admin,/id="adminHero"/);
+assert.equal((patron.match(/data-feature="recettes"/g)||[]).length,2);
+assert.equal((patron.match(/data-feature="carte"/g)||[]).length,2);
+assert.match(patron,/setInterval\(refreshPatronFeatures,15000\)/);
+assert.match(patron,/window\.addEventListener\('focus',refreshPatronFeatures\)/);
+assert.match(admin,/'Prefer':'return=representation'/);
 for(const html of [patron,admin]){
   assert.match(html,/id="cSumup"/);
   assert.match(html,/id="cTaxiCheque"/);
