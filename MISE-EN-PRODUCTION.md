@@ -17,6 +17,9 @@ Résultat attendu :
 - tables : `fleets`, `profiles`, `carnets`, `plates`, `plate_sessions`,
   `positions`, `fleet_config` ;
 - RLS activée sur les sept tables ;
+- table d'audit `private.carnet_audit` avec RLS et aucun accès Data API ;
+- fonctions `admin_ride_mutation` et `positions_live` réservées aux utilisateurs
+  connectés, avec validation du rôle à l'intérieur ;
 - accès `anon` révoqué ;
 - accès des utilisateurs connectés filtré par les policies.
 
@@ -102,8 +105,12 @@ Faire le test avec une flotte et deux téléphones :
 7. terminer la course, rendre la plaque et vérifier que plus aucun nouveau
    point GPS n’est accepté ;
 8. suspendre la flotte et vérifier que recettes et carte patron sont bloquées.
+9. dans l'espace super-admin, afficher toutes les flottes sur la carte et
+   vérifier qu'un chauffeur sans point apparaît comme « GPS en attente » ;
+10. modifier puis supprimer une course de test depuis l'espace super-admin,
+    et vérifier que le total est recalculé après chaque action.
 
-Ne commencer avec de l’argent réel qu’après réussite des huit contrôles.
+Ne commencer avec de l'argent réel qu'après réussite des dix contrôles.
 
 ## 7. Usage réglementaire du compteur
 

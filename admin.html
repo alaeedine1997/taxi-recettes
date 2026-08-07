@@ -332,6 +332,15 @@
           <div id="cDetail" class="hidden" style="margin-top:10px;overflow-x:auto"></div>
         </div>
 
+        <div class="csec" id="rideAdminSec">
+          <div class="ride-admin-head">
+            <h3>Courses enregistrées</h3>
+            <span class="pill on" id="cRideCount">0 course</span>
+          </div>
+          <p class="chelp">Les corrections sont appliquées au carnet synchronisé du chauffeur et consignées dans un audit privé.</p>
+          <div id="cRideAdminList" class="ride-admin-list"></div>
+        </div>
+
         <!-- réglages du partage -->
         <div class="csec">
           <h3>Réglages du partage</h3>
@@ -392,12 +401,13 @@
 
     <!-- Carte GPS en direct -->
     <div class="card hidden" id="mapCard" data-sec="carte" data-allowed="0">
-      <h2>Carte en direct</h2>
-      <p class="hint">Position mesurée du chauffeur, heure du dernier point et rayon de précision GPS. Le cercle autour du taxi représente l'incertitude réelle.</p>
-      <div class="frow">
-        <select id="mapFleet" class="hidden"></select>
-        <select id="mapReplay"><option value="">— Trajet du jour : choisir une plaque —</option></select>
+      <h2>Suivi réseau en direct</h2>
+      <p class="hint">Chaque chauffeur en service reste visible. La position, son heure et le rayon de précision proviennent directement du GPS de son téléphone.</p>
+      <div class="frow map-toolbar">
+        <div class="map-filter"><label for="mapFleet">Flotte affichée</label><select id="mapFleet"><option value="">Toutes les flottes</option></select></div>
+        <div class="map-filter replay-filter"><label for="mapReplay">Trajet du jour</label><select id="mapReplay"><option value="">Choisir une plaque</option></select></div>
         <button type="button" class="btn sm" id="mapLiveBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5"/><path d="M20 4v7h-7"/></svg>Rafraîchir</button>
+        <button type="button" class="btn sm ghost" id="mapFitBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Voir tout</button>
         <span class="muted" id="mapStatus"></span>
       </div>
       <section class="tracker-list" id="trackerList" aria-label="Véhicules suivis"></section>
@@ -429,6 +439,46 @@
     </div>
   </main>
 </div>
+
+<dialog class="ride-dialog" id="rideEditDialog" aria-labelledby="rideEditTitle">
+  <form id="rideEditForm">
+    <div class="ride-dialog-head">
+      <div>
+        <span class="role-eyebrow">Correction super-admin</span>
+        <h2 id="rideEditTitle">Modifier la course</h2>
+        <p id="rideEditMeta"></p>
+      </div>
+      <button type="button" class="ride-dialog-close" id="rideEditClose" aria-label="Fermer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="ride-dialog-body">
+      <div class="row c2">
+        <div><label for="rideEditTime">Heure</label><input type="time" id="rideEditTime"></div>
+        <div><label for="rideEditAmount">Montant brut (€)</label><input type="text" inputmode="decimal" id="rideEditAmount" autocomplete="off" required></div>
+      </div>
+      <div class="row c2" style="margin-top:12px">
+        <div><label for="rideEditSource">Source</label><select id="rideEditSource"></select></div>
+        <div><label for="rideEditPayment">Paiement</label><select id="rideEditPayment">
+          <option value="app">Payé sur l'application</option>
+          <option value="cash">Cash à bord</option>
+          <option value="sumup">SumUp</option>
+          <option value="cheque">Chèque taxi</option>
+          <option value="appcash">Application + cash</option>
+        </select></div>
+      </div>
+      <div class="row c2" style="margin-top:12px">
+        <div><label for="rideEditRate">Retenue de la source (%)</label><input type="text" inputmode="decimal" id="rideEditRate" autocomplete="off"></div>
+        <div id="rideEditCashWrap"><label for="rideEditCash">Cash compris dans la course (€)</label><input type="text" inputmode="decimal" id="rideEditCash" autocomplete="off"></div>
+      </div>
+      <div class="err" id="rideEditErr" role="alert" aria-live="polite"></div>
+    </div>
+    <div class="ride-dialog-actions">
+      <button type="button" class="btn ghost" id="rideEditCancel">Annuler</button>
+      <button type="submit" class="btn primary" id="rideEditSave">Enregistrer la correction</button>
+    </div>
+  </form>
+</dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -499,6 +549,7 @@ async function login(user, pass){
 function resetCalc(){
   _sheet=null; _reqSeq++;
   try{
+    closeRideEditor();
     $('cSheet').classList.add('hidden'); $('cResult').innerHTML=''; $('cSheetKpis').innerHTML=''; $('cErr').textContent='';
     $('cSumup').value=''; $('cTaxiCheque').value=''; $('cPaymentErr').textContent='';
     $('cSumup').removeAttribute('aria-invalid'); $('cTaxiCheque').removeAttribute('aria-invalid');
@@ -900,7 +951,8 @@ $('platesList').addEventListener('click', async e=>{
 });
 
 /* ---- carte GPS (Étape 3) ---- */
-let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0,_trackers={};
+let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0,_replayReqSeq=0,_trackers={};
+let _mapAutoFit=true,_lastLivePoints=[];
 function trackerIcon(delayed){
   return L.divIcon({className:'',iconSize:[42,42],iconAnchor:[13,36],popupAnchor:[8,-34],html:
     '<span class="taxi-pin'+(delayed?' delayed':'')+'"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>'});
@@ -913,91 +965,143 @@ function ensureMap(){
   _liveLayer=L.layerGroup().addTo(_map); _replayLayer=L.layerGroup().addTo(_map);
   return _map;
 }
-function currentMapFleet(){ return currentFleet(); }
+function liveDriverGroups(rows){
+  const groups=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    if(!row||!row.driver_id||!row.plate_id) return;
+    const key=String(row.driver_id);
+    if(!groups.has(key)) groups.set(key,{key,meta:row,points:[]});
+    const group=groups.get(key);
+    if(!group.meta.driver_name && row.driver_name) group.meta=row;
+    const lat=Number(row.lat), lng=Number(row.lng), measured=Date.parse(row.recorded_at);
+    if(isFinite(lat)&&isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180&&isFinite(measured)){
+      group.points.push(Object.assign({},row,{lat,lng,_measured:measured}));
+    }
+  });
+  return Array.from(groups.values()).map(group=>{
+    group.points.sort((a,b)=>b._measured-a._measured);
+    group.latest=group.points[0]||null;
+    return group;
+  }).sort((a,b)=>{
+    const located=(b.latest?1:0)-(a.latest?1:0);
+    if(located) return located;
+    return String(a.meta.driver_name||'').localeCompare(String(b.meta.driver_name||''),'fr');
+  });
+}
+function currentMapFleet(){ return $('mapFleet').value||null; }
+function fillMapFleet(){
+  const sel=$('mapFleet'), previous=sel.value;
+  sel.innerHTML='<option value="">Toutes les flottes</option>'+(_fleetsCache||[]).map(f=>
+    '<option value="'+f.id+'">'+esc(f.name)+(f.suspended?' (suspendue)':'')+'</option>'
+  ).join('');
+  if(previous && (_fleetsCache||[]).some(f=>f.id===previous)) sel.value=previous;
+  else sel.value='';
+}
 function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
+function fitLiveDrivers(){
+  if(!_map||!_lastLivePoints.length) return;
+  try{ _map.fitBounds(_lastLivePoints,{padding:[50,50],maxZoom:_lastLivePoints.length===1?17:15}); }catch(_){ }
+}
 async function loadLive(){
   if(!_map) return;
   const fid=currentMapFleet();
-  const isAll = IS_ADMIN_APP && !fid;   /* super-admin : toutes les flottes */
-  if(!fid && !isAll) return;
+  const isAll=!fid;
   const requestedFleet=fid||'__all__', my=++_liveReqSeq;
+  $('mapStatus').textContent='Actualisation…';
   const r=await api('/rest/v1/rpc/positions_live',{
     method:'POST',
     body:JSON.stringify({p_fleet:isAll?null:fid,p_points:40})
   });
   if(my!==_liveReqSeq || requestedFleet!==(currentMapFleet()||'__all__')) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
-  const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
+  const groups=liveDriverGroups(r.data);
   const seen=new Set(), pts=[], cards=[];
-  Object.keys(latest).forEach(k=>{ const p=latest[k];
-    const nm=p.plate_label||'?', drv=p.driver_name||'';
-    const flLine = isAll ? '<br><span style="color:#888">'+esc(fleetName(p.fleet_id)||'')+'</span>' : '';
-    const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
+  groups.forEach(group=>{
+    const k=group.key, p=group.latest, meta=group.meta;
+    const nm=meta.plate_label||'?', drv=meta.driver_name||'Chauffeur', fl=fleetName(meta.fleet_id)||'Flotte inconnue';
+    if(!p){
+      cards.push('<button type="button" class="tracker-car offline" disabled><span class="tracker-dot"></span><strong>'+esc(drv)+'</strong><small>'+esc(nm)+' · '+esc(fl)+' · GPS en attente</small></button>');
+      return;
+    }
+    const acc=Math.max(0,Number(p.accuracy)||0), ageSec=Math.max(0,Math.round((Date.now()-p._measured)/1000));
+    const flLine='<br><span style="color:#667085">'+esc(fl)+'</span>';
     const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+flLine+
-      '<br><span style="color:#557070">'+(delayed?'Dernière position · il y a '+Math.round(ageSec/60)+' min':'Direct · il y a '+ageSec+' s')+
-      (acc>0?' · précision ±'+Math.round(acc)+' m':'')+'</span>';
+      '<br><span style="color:#557070">'+(delayed?'Dernière mesure · il y a '+Math.max(1,Math.round(ageSec/60))+' min':'Direct · il y a '+ageSec+' s')+
+      (acc>0?' · précision ±'+Math.round(acc)+' m':' · précision non fournie')+'</span>'+
+      '<br><span class="map-coords">'+p.lat.toFixed(5)+', '+p.lng.toFixed(5)+'</span>'+
+      '<br><a href="https://www.openstreetmap.org/?mlat='+encodeURIComponent(p.lat)+'&mlon='+encodeURIComponent(p.lng)+'#map=19/'+encodeURIComponent(p.lat)+'/'+encodeURIComponent(p.lng)+'" target="_blank" rel="noopener">Ouvrir ce point</a>';
     seen.add(k);
     if(!_trackers[k]){
-      const trailPts=(r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]);
+      const trailPts=group.points.slice().reverse().map(x=>[x.lat,x.lng]);
       const trail=L.polyline(trailPts,{color:'#0F766E',weight:4,opacity:.7,lineCap:'round'}).addTo(_liveLayer);
       const marker=L.marker([p.lat,p.lng],{icon:trackerIcon(delayed)}).bindPopup(popup).addTo(_liveLayer);
       const circle=L.circle([p.lat,p.lng],{radius:Math.max(1,acc),color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}).addTo(_liveLayer);
       _trackers[k]={marker,circle,trail,delayed};
     }else{
-      _trackers[k].trail.setLatLngs((r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]));
+      _trackers[k].trail.setLatLngs(group.points.slice().reverse().map(x=>[x.lat,x.lng]));
       _trackers[k].marker.setLatLng([p.lat,p.lng]).setPopupContent(popup);
       if(_trackers[k].delayed!==delayed){ _trackers[k].marker.setIcon(trackerIcon(delayed)); _trackers[k].delayed=delayed; }
       _trackers[k].circle.setLatLng([p.lat,p.lng]).setRadius(Math.max(1,acc));
     }
-    cards.push('<button type="button" class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
+    cards.push('<button type="button" class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(drv)+'</strong><small>'+esc(nm)+' · '+(isAll?esc(fl)+' · ':'')+(delayed?Math.max(1,Math.round(ageSec/60))+' min':ageSec+' s')+'</small></button>');
     pts.push([p.lat,p.lng]);
   });
   Object.keys(_trackers).forEach(k=>{ if(!seen.has(k)){ _liveLayer.removeLayer(_trackers[k].marker); _liveLayer.removeLayer(_trackers[k].circle); _liveLayer.removeLayer(_trackers[k].trail); delete _trackers[k]; } });
   $('trackerList').innerHTML=cards.join('');
-  $('mapStatus').textContent = pts.length ? ('Actualisé · '+pts.length+' plaque'+(pts.length>1?'s':'')+' localisée'+(pts.length>1?'s':'')) : 'Aucune position depuis 10 minutes';
-  if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
+  _lastLivePoints=pts; $('mapFitBtn').disabled=!pts.length;
+  $('mapStatus').textContent = groups.length
+    ? pts.length+'/'+groups.length+' chauffeur'+(groups.length>1?'s':'')+' localisé'+(groups.length>1?'s':'')+' · '+new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    : 'Aucun chauffeur en service';
+  if(pts.length && _mapAutoFit && !_replayLayer.getLayers().length){ fitLiveDrivers(); _mapAutoFit=false; }
 }
 $('trackerList').addEventListener('click',e=>{ const b=e.target.closest('[data-track]'); if(!b||!_trackers[b.dataset.track]) return; const m=_trackers[b.dataset.track].marker; _map.flyTo(m.getLatLng(),17,{duration:.65}); m.openPopup(); });
 async function loadReplay(plateId){
   if(!_replayLayer) return;
+  const my=++_replayReqSeq;
   _replayLayer.clearLayers();
-  if(!plateId) return;
+  if(!plateId){ _mapAutoFit=true; return; }
   const start=new Date(); start.setHours(0,0,0,0);
-  const r=await api('/rest/v1/positions?select=lat,lng&plate_id=eq.'+plateId+'&recorded_at=gte.'+start.toISOString()+'&order=recorded_at.asc&limit=3000');
+  const r=await api('/rest/v1/positions?select=lat,lng&plate_id=eq.'+encodeURIComponent(plateId)+'&recorded_at=gte.'+encodeURIComponent(start.toISOString())+'&order=recorded_at.asc&limit=3000');
+  if(my!==_replayReqSeq||plateId!==$('mapReplay').value) return;
   if(!r.ok){ toast('Trajet indisponible'); return; }
-  const pts=(r.data||[]).map(p=>[p.lat,p.lng]);
+  const pts=(r.data||[]).map(p=>[Number(p.lat),Number(p.lng)]).filter(p=>isFinite(p[0])&&isFinite(p[1])&&p[0]>=-90&&p[0]<=90&&p[1]>=-180&&p[1]<=180);
   if(!pts.length){ toast('Aucun trajet aujourd\'hui pour cette plaque'); return; }
   _replayLayer.addLayer(L.polyline(pts,{color:'#B14A28',weight:4,opacity:.85}));
   _replayLayer.addLayer(L.circleMarker(pts[0],{radius:6,color:'#4F7A43',fillColor:'#4F7A43',fillOpacity:1}).bindPopup('Départ'));
   _replayLayer.addLayer(L.circleMarker(pts[pts.length-1],{radius:6,color:'#B4362B',fillColor:'#B4362B',fillOpacity:1}).bindPopup('Dernier point'));
   try{ _map.fitBounds(pts,{padding:[40,40]}); }catch(_){ }
+  _mapAutoFit=false;
 }
 async function fillReplayPlates(){
   const fid=currentMapFleet(), sel=$('mapReplay');
-  const isAll = IS_ADMIN_APP && !fid;
-  if(!fid && !isAll){ sel.innerHTML='<option value="">—</option>'; return; }
-  const filter = isAll ? '' : '&fleet_id=eq.'+fid;
+  const previous=sel.value, isAll=!fid;
+  const filter = isAll ? '' : '&fleet_id=eq.'+encodeURIComponent(fid);
   const r=await api('/rest/v1/plates?select=id,label,fleet_id&order=label.asc'+filter);
-  sel.innerHTML='<option value="">— Trajet du jour : choisir une plaque —</option>'+
+  sel.innerHTML='<option value="">Choisir une plaque</option>'+
     ((r.ok&&r.data)?r.data:[]).map(p=>'<option value="'+p.id+'">'+esc(p.label)+(isAll?' · '+esc(fleetName(p.fleet_id)):'')+'</option>').join('');
+  if(previous && Array.from(sel.options).some(option=>option.value===previous)) sel.value=previous;
 }
 function setupMapCard(){
-  /* la flotte affichee vient de la barre du haut : un seul endroit ou choisir */
-  const f=(_fleetsCache||[]).find(x=>x.id===currentFleet())||null;
-  const show = !!(f && !f.suspended && (f.opt_gps_live||f.opt_replay));
+  const show=IS_ADMIN_APP;
   setAllowed('mapCard', show);
   stopPoll();
   if(!show) return;
   if(!ensureMap()){ $('mapStatus').textContent='Carte indisponible (Leaflet non chargé).'; return; }
-  $('mapFleet').classList.add('hidden');
+  fillMapFleet();
+  $('mapFitBtn').disabled=!_lastLivePoints.length;
   setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
   fillReplayPlates();
   /* le rafraîchissement (une requête toutes les 8 s) ne tourne QUE sur l'onglet Carte */
   if(_sec==='carte'){ loadLive(); _pollTimer=setInterval(loadLive, 8000); }
 }
 $('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
-$('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
+$('mapFleet').addEventListener('change', ()=>{
+  _liveReqSeq++; _replayReqSeq++; _mapAutoFit=true; _lastLivePoints=[]; _trackers={};
+  if(_liveLayer) _liveLayer.clearLayers(); if(_replayLayer) _replayLayer.clearLayers();
+  $('trackerList').innerHTML=''; $('mapReplay').value=''; fillReplayPlates(); loadLive();
+});
 $('mapLiveBtn').addEventListener('click', loadLive);
+$('mapFitBtn').addEventListener('click',fitLiveDrivers);
 
 /* ---- réglages de flotte : sources + carburant (Étape 4) ---- */
 let _cfgSrc=[], _cfgReqSeq=0;
@@ -1124,8 +1228,8 @@ function applySection(){
     b.classList.toggle('on',active);
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
-  /* la barre "flotte" ne sert que pour les sections rattachees a UNE flotte */
-  $('fleetBar').classList.toggle('hidden', _sec==='global');
+  /* La carte possède son filtre réseau (toutes les flottes ou une seule). */
+  $('fleetBar').classList.toggle('hidden', _sec==='global'||_sec==='carte');
   const vide = !document.querySelector('.card[data-sec="'+_sec+'"]:not(.hidden)');
   $('secEmpty').classList.toggle('hidden', !vide);
 }
@@ -1142,8 +1246,8 @@ function showSection(k){
   try{ $('pageTitle').focus({preventScroll:true}); }catch(_){ }
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(_){ window.scrollTo(0,0); }
   if(k==='carte'){
-    if(_map){ setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
-              loadLive(); if(!_pollTimer) _pollTimer=setInterval(loadLive, 8000); }
+    setupMapCard();
+    if(_map){ setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120); }
   } else stopPoll();
 }
 $('tabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-sec]'); if(b) showSection(b.dataset.sec); });
@@ -1175,8 +1279,10 @@ function refreshCurrentFleetAccess(){
   const f=(_fleetsCache||[]).find(x=>x.id===fid)||null;
   setAllowed('platesCard', !!f);
   setAllowed('cfgCard',    !!f);
-  setAllowed('calcCard',   !!(f && !f.suspended && f.opt_recettes));   /* Recettes = option debloquee */
-  setAllowed('mapCard',    !!(f && !f.suspended && (f.opt_gps_live||f.opt_replay)));
+  /* L'option recettes contrôle l'espace patron. Le super-admin conserve
+     l'accès à l'historique, y compris pour une flotte suspendue. */
+  setAllowed('calcCard',   !!f);
+  setAllowed('mapCard',    IS_ADMIN_APP);  /* supervision réseau indépendante des options client */
   return f;
 }
 function onFleetChange(silencieux){
@@ -1241,6 +1347,42 @@ function cRideOnboard(r){
   const amount=Math.max(0,Math.round((Number(r.amt)||0)*100)/100);
   if(r.pay==='appcash') return Math.min(amount,Math.max(0,Math.round((Number(r.cash)||0)*100)/100));
   return r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque' ? amount : 0;
+}
+function parseAdminDecimal(raw){
+  let t=String(raw==null?'':raw).replace(/[\s\u00a0\u202f\u20ac%]/g,'');
+  if(!t) return NaN;
+  if(t.includes(',')){
+    if(t.indexOf(',')!==t.lastIndexOf(',')) return NaN;
+    t=t.replace(/\./g,'').replace(',','.');
+  } else if(/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) t=t.replace(/\./g,'');
+  if(!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return NaN;
+  const value=Number(t);
+  return isFinite(value) ? Math.round(value*100)/100 : NaN;
+}
+function normalizeAdminRideInput(input){
+  const amount=parseAdminDecimal(input.amount), rate=parseAdminDecimal(input.rate);
+  const pay=String(input.pay||''), source=String(input.source||''), time=String(input.time||'');
+  const sourceName=String(input.sourceName||'');
+  if(!(amount>0) || amount>100000) return {ok:false,error:'Entre un montant supérieur à 0 €.'};
+  if(!source || source.length>80) return {ok:false,error:'Choisis une source valide.'};
+  if(time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return {ok:false,error:'Heure invalide.'};
+  if(!['app','cash','sumup','cheque','appcash'].includes(pay)) return {ok:false,error:'Choisis un paiement valide.'};
+  if(!isFinite(rate) || rate<0 || rate>100) return {ok:false,error:'La retenue doit être comprise entre 0 et 100 %.'};
+  const ride={t:time,src:source,srcName:sourceName,pay,amt:amount,rate:(pay==='app'||pay==='appcash')?0:rate};
+  if(pay==='appcash'){
+    const cash=parseAdminDecimal(input.cash);
+    if(!isFinite(cash) || cash<0 || cash>amount) return {ok:false,error:'Le cash compris doit être entre 0 € et le montant brut.'};
+    ride.cash=cash;
+  }
+  return {ok:true,ride};
+}
+function ridePaymentLabel(pay){
+  return ({app:'Application',cash:'Cash',sumup:'SumUp',cheque:'Chèque taxi',appcash:'App + cash'})[pay]||'Autre';
+}
+function rideSourceLabel(db,ride){
+  if(ride.srcName) return String(ride.srcName);
+  const source=(db.sources||[]).find(s=>s&&String(s.id)===String(ride.src));
+  return source ? String(source.name||source.id) : String(ride.src||'Source inconnue');
 }
 function cSettlement(onboard,sumup,cheque,chauffeurDue){
   const cents=v=>Math.round((Number(v)||0)*100);
@@ -1333,7 +1475,7 @@ async function loadSheet(){
   if(isFinite(fpk) && fpk>0 && !num('cFuelKm')) $('cFuelKm').value=String(fpk).replace('.',',');
   const R=x=>Math.round(x*100)/100;
   let brut=0, net=0, onboard=0, km=0, charges=0, nDays=0, kmMissing=0;
-  const rows=[];
+  const rows=[], rideRows=[];
   /* On n'accepte QUE des clés de jour au format attendu : le carnet vient du
      téléphone du chauffeur, donc son contenu n'est pas de confiance. */
   Object.keys(days).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k) && k>=from && k<=to).sort().forEach(k=>{
@@ -1355,9 +1497,25 @@ async function loadSheet(){
     if(d.kmStart!=null && d.kmEnd!=null && isFinite(kS) && isFinite(kE) && kE>=kS) dKm=kE-kS; else kmMissing++;
     nDays++; brut+=dBrut; net+=dNet; onboard+=dOnboard; charges+=dCh; if(dKm) km+=dKm;
     rows.push({k,dBrut,dNet,dOnboard,dCh,dKm,n:rides.length});
+    rides.forEach(ride=>{
+      if(!ride.id) return;
+      rideRows.push({
+        day:k,
+        id:String(ride.id),
+        t:String(ride.t||''),
+        src:String(ride.src||''),
+        srcName:rideSourceLabel(db,ride),
+        pay:String(ride.pay||'app'),
+        amt:R(Number(ride.amt)||0),
+        rate:Math.min(100,Math.max(0,isFinite(Number(ride.rate))?Number(ride.rate):cRateOf(db,ride.src))),
+        cash:R(Number(ride.cash)||0),
+        net:R(cRideNet(db,ride))
+      });
+    });
   });
   brut=R(brut); net=R(net); onboard=R(onboard); charges=R(charges);
-  _sheet={uid,from,to,brut,net,onboard,km,charges,nDays,kmMissing,rows,who};
+  rideRows.sort((a,b)=>b.day.localeCompare(a.day)||String(b.t).localeCompare(String(a.t))||b.id.localeCompare(a.id));
+  _sheet={uid,from,to,brut,net,onboard,km,charges,nDays,kmMissing,rows,rideRows,sources:Array.isArray(db.sources)?db.sources:[],who};
   renderSheet();
   $('cSheet').classList.remove('hidden');
 }
@@ -1382,8 +1540,119 @@ function renderSheet(){
     (s.rows.length?s.rows.map(r=>'<tr><td>'+r.k+'</td><td>'+r.n+'</td><td>'+eur(r.dBrut)+'</td><td>'+eur(r.dNet)+'</td><td>'+eur(r.dOnboard)+'</td><td>'+(r.dKm==null?'—':r.dKm)+'</td></tr>').join('')
       :'<tr><td colspan="6" class="muted">Aucun jour travaillé sur la période.</td></tr>')+
     '</tbody></table>';
+  renderAdminRides();
   compute();
 }
+
+function renderAdminRides(){
+  const list=(_sheet&&_sheet.rideRows)||[];
+  $('cRideCount').textContent=list.length+' course'+(list.length>1?'s':'');
+  if(!list.length){
+    $('cRideAdminList').innerHTML='<div class="empty">Aucune course sur cette période.</div>';
+    return;
+  }
+  $('cRideAdminList').innerHTML='<div class="ride-table-scroll"><table class="led ride-led"><thead><tr><th>Date</th><th>Heure</th><th>Source</th><th>Paiement</th><th>Brut</th><th>Net</th><th>Actions</th></tr></thead><tbody>'+
+    list.map((ride,index)=>'<tr>'+
+      '<td>'+esc(ride.day)+'</td><td>'+(ride.t?esc(ride.t):'—')+'</td><td>'+esc(ride.srcName)+'</td><td>'+esc(ridePaymentLabel(ride.pay))+'</td>'+
+      '<td>'+eur(ride.amt)+'</td><td>'+eur(ride.net)+'</td><td class="ride-actions">'+
+        '<button type="button" class="btn sm ghost" data-ride-edit="'+index+'">Modifier</button>'+
+        '<button type="button" class="btn sm ghost danger" data-ride-delete="'+index+'">Supprimer</button>'+
+      '</td></tr>').join('')+'</tbody></table></div>';
+}
+
+let _editingRide=null;
+function updateRideEditorState(){
+  const pay=$('rideEditPayment').value, appPay=pay==='app'||pay==='appcash';
+  $('rideEditCashWrap').classList.toggle('hidden',pay!=='appcash');
+  $('rideEditRate').disabled=appPay;
+  if(appPay) $('rideEditRate').value='0';
+}
+function closeRideEditor(){
+  _editingRide=null;
+  const dialog=$('rideEditDialog');
+  if(!dialog) return;
+  try{ if(dialog.open) dialog.close(); }catch(_){ dialog.removeAttribute('open'); }
+}
+function openRideEditor(ride){
+  if(!ride||!_sheet) return;
+  _editingRide=ride;
+  const sources=_sheet.sources.slice();
+  if(!sources.some(s=>String(s.id)===ride.src)) sources.push({id:ride.src,name:ride.srcName,rate:ride.rate});
+  $('rideEditSource').innerHTML=sources.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name||s.id)+'</option>').join('');
+  $('rideEditSource').value=ride.src;
+  $('rideEditTime').value=ride.t;
+  $('rideEditAmount').value=String(ride.amt.toFixed(2)).replace('.',',');
+  $('rideEditPayment').value=ride.pay;
+  $('rideEditRate').value=String(Number(ride.rate).toFixed(2)).replace('.',',');
+  $('rideEditCash').value=String(Number(ride.cash||0).toFixed(2)).replace('.',',');
+  $('rideEditMeta').textContent=ride.day+' · '+_sheet.who+' · '+ride.srcName;
+  $('rideEditErr').textContent='';
+  updateRideEditorState();
+  const dialog=$('rideEditDialog');
+  try{ dialog.showModal(); }catch(_){ dialog.setAttribute('open',''); }
+  setTimeout(()=>$('rideEditAmount').focus(),0);
+}
+function rideMutationError(response){
+  const code=response&&response.data&&(response.data.message||response.data.code);
+  if(code==='admin_required') return 'Cette action est réservée au super-admin.';
+  if(code==='ride_not_found') return 'Cette course a déjà été modifiée ou supprimée. Recharge la fiche.';
+  if(code==='ride_invalid'||code==='ride_request_invalid') return 'Les données de la course sont invalides.';
+  if(response&&response.status===404) return 'Installe la dernière mise à jour Supabase avant de corriger une course.';
+  return 'La correction n’a pas pu être enregistrée.';
+}
+async function mutateAdminRide(action,ride,updatedRide){
+  const response=await api('/rest/v1/rpc/admin_ride_mutation',{
+    method:'POST',
+    body:JSON.stringify({p_action:action,p_driver:_sheet.uid,p_day:ride.day,p_ride_id:ride.id,p_ride:updatedRide||null})
+  });
+  if(!response.ok) return {ok:false,error:rideMutationError(response)};
+  return {ok:true};
+}
+$('cRideAdminList').addEventListener('click',async event=>{
+  const edit=event.target.closest('[data-ride-edit]');
+  if(edit){ openRideEditor((_sheet.rideRows||[])[Number(edit.dataset.rideEdit)]); return; }
+  const del=event.target.closest('[data-ride-delete]');
+  if(!del||!_sheet) return;
+  const ride=(_sheet.rideRows||[])[Number(del.dataset.rideDelete)];
+  if(!ride) return;
+  if(!confirm('Supprimer définitivement la course de '+eur(ride.amt)+' du '+ride.day+' ?\n\nCette action sera enregistrée dans l’audit.')) return;
+  del.disabled=true;
+  const result=await mutateAdminRide('delete',ride,null);
+  if(!result.ok){ del.disabled=false; toast(result.error); return; }
+  toast('Course supprimée et auditée');
+  await loadSheet();
+});
+$('rideEditPayment').addEventListener('change',updateRideEditorState);
+$('rideEditSource').addEventListener('change',()=>{
+  if(!_sheet) return;
+  const source=_sheet.sources.find(s=>String(s.id)===$('rideEditSource').value);
+  if(source && isFinite(Number(source.rate))) $('rideEditRate').value=String(Number(source.rate)).replace('.',',');
+  updateRideEditorState();
+});
+$('rideEditClose').addEventListener('click',closeRideEditor);
+$('rideEditCancel').addEventListener('click',closeRideEditor);
+$('rideEditDialog').addEventListener('close',()=>{ _editingRide=null; });
+$('rideEditForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!_editingRide||!_sheet) return;
+  const sourceOption=$('rideEditSource').selectedOptions[0];
+  const normalized=normalizeAdminRideInput({
+    time:$('rideEditTime').value,
+    amount:$('rideEditAmount').value,
+    source:$('rideEditSource').value,
+    sourceName:sourceOption?sourceOption.textContent:'',
+    pay:$('rideEditPayment').value,
+    rate:$('rideEditRate').value,
+    cash:$('rideEditCash').value
+  });
+  if(!normalized.ok){ $('rideEditErr').textContent=normalized.error; return; }
+  const save=$('rideEditSave'); save.disabled=true; save.textContent='Enregistrement…';
+  const result=await mutateAdminRide('update',_editingRide,normalized.ride);
+  save.disabled=false; save.textContent='Enregistrer la correction';
+  if(!result.ok){ $('rideEditErr').textContent=result.error; return; }
+  closeRideEditor(); toast('Course corrigée et auditée');
+  await loadSheet();
+});
 
 /* --- le calcul --- */
 function compute(){

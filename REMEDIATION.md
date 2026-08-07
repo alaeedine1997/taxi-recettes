@@ -27,7 +27,7 @@ déploiement et de recette finale est dans `MISE-EN-PRODUCTION.md`.
   - résolution LWW par champ pour les kilomètres et horaires.
 - Requêtes :
   - réponses obsolètes rejetées pour réglages, calculs et carte GPS ;
-  - carte live limitée par plaque au lieu d'une limite globale évictive ;
+  - carte live limitée par chauffeur actif, avec index composite et état GPS en attente ;
   - création flotte + patron conservée si la réponse réseau est ambiguë ;
   - enregistrement des réglages désactivé si leur chargement échoue.
 - Android/GPS :
@@ -48,6 +48,11 @@ déploiement et de recette finale est dans `MISE-EN-PRODUCTION.md`.
     encore valide ;
   - positions, sessions clôturées, carnet et prise de plaque sont refusés aux
     membres suspendus.
+- Super-admin :
+  - édition et suppression atomiques d'une course du carnet synchronisé ;
+  - tombstone lors d'une suppression pour empêcher sa résurrection hors ligne ;
+  - historique avant/après conservé dans un audit privé inaccessible à l'API ;
+  - carte réseau toutes flottes, regroupée par chauffeur et sans recadrage périodique.
 - Signature :
   - clé privée compromise retirée ;
   - aucun mot de passe de signature dans le dépôt.
@@ -77,7 +82,8 @@ Deux téléphones + faux PostgREST : aucune perte : OK
 Migrations SQL exécutées deux fois + RLS adversariale : OK
 Anciennes policies + usurpation patron/chauffeur : refusées
 Flotte suspendue + horodatages de session forgés : refusés
-Carte live bornée par plaque : OK
+Carte live bornée par chauffeur + index composite : OK
+Mutation admin + audit privé : OK
 Syntaxe JavaScript des 5 pages (dont asset Android) : OK
 Syntaxe TypeScript de l'Edge Function : OK
 3 APK debug + 3 APK release : OK

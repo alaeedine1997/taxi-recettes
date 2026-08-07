@@ -803,23 +803,30 @@ async function loadLive(){
   });
   if(my!==_liveReqSeq || fid!==currentMapFleet() || !_patronFeatures.gpsLive) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
-  const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
+  const rows=Array.isArray(r.data)?r.data:[], latest={}, pending={};
+  rows.forEach(p=>{
+    if(!p||!p.plate_id) return;
+    const lat=Number(p.lat), lng=Number(p.lng), measured=Date.parse(p.recorded_at);
+    if(Number.isFinite(lat)&&Number.isFinite(lng)&&Number.isFinite(measured)){
+      if(!latest[p.plate_id]) latest[p.plate_id]=Object.assign({},p,{lat,lng,_measured:measured});
+    }else if(!pending[p.plate_id]) pending[p.plate_id]=p;
+  });
   const seen=new Set(), pts=[], cards=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
     const nm=p.plate_label||'?', drv=p.driver_name||'';
-    const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-Date.parse(p.recorded_at))/1000));
+    const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-p._measured)/1000));
     const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+
       '<br><span style="color:#557070">'+(delayed?'Dernière position · il y a '+Math.round(ageSec/60)+' min':'Direct · il y a '+ageSec+' s')+
       (acc>0?' · précision ±'+Math.round(acc)+' m':'')+'</span>';
     seen.add(k);
     if(!_trackers[k]){
-      const trailPts=(r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]);
+      const trailPts=rows.filter(x=>x.plate_id===k&&Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))).slice().reverse().map(x=>[Number(x.lat),Number(x.lng)]);
       const trail=L.polyline(trailPts,{color:'#0F766E',weight:4,opacity:.7,lineCap:'round'}).addTo(_liveLayer);
       const marker=L.marker([p.lat,p.lng],{icon:trackerIcon(delayed)}).bindPopup(popup).addTo(_liveLayer);
       const circle=L.circle([p.lat,p.lng],{radius:Math.max(1,acc),color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}).addTo(_liveLayer);
       _trackers[k]={marker,circle,trail,delayed};
     }else{
-      _trackers[k].trail.setLatLngs((r.data||[]).filter(x=>x.plate_id===k).slice().reverse().map(x=>[x.lat,x.lng]));
+      _trackers[k].trail.setLatLngs(rows.filter(x=>x.plate_id===k&&Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))).slice().reverse().map(x=>[Number(x.lat),Number(x.lng)]));
       _trackers[k].marker.setLatLng([p.lat,p.lng]).setPopupContent(popup);
       if(_trackers[k].delayed!==delayed){ _trackers[k].marker.setIcon(trackerIcon(delayed)); _trackers[k].delayed=delayed; }
       _trackers[k].circle.setLatLng([p.lat,p.lng]).setRadius(Math.max(1,acc));
@@ -827,9 +834,18 @@ async function loadLive(){
     cards.push('<button type="button" class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
     pts.push([p.lat,p.lng]);
   });
+  Object.keys(pending).forEach(k=>{
+    if(latest[k]) return;
+    const p=pending[k], nm=p.plate_label||'?', drv=p.driver_name||'Chauffeur';
+    seen.add(k);
+    cards.push('<button type="button" class="tracker-car offline" disabled><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv)+' · GPS en attente</small></button>');
+  });
   Object.keys(_trackers).forEach(k=>{ if(!seen.has(k)){ _liveLayer.removeLayer(_trackers[k].marker); _liveLayer.removeLayer(_trackers[k].circle); _liveLayer.removeLayer(_trackers[k].trail); delete _trackers[k]; } });
   $('trackerList').innerHTML=cards.join('');
-  $('mapStatus').textContent = pts.length ? ('Actualisé · '+pts.length+' plaque'+(pts.length>1?'s':'')+' localisée'+(pts.length>1?'s':'')) : 'Aucune position depuis 10 minutes';
+  const activeCount=Object.keys(latest).length+Object.keys(pending).filter(k=>!latest[k]).length;
+  $('mapStatus').textContent = activeCount
+    ? ('Actualisé · '+pts.length+'/'+activeCount+' chauffeur'+(activeCount>1?'s':'')+' localisé'+(pts.length>1?'s':''))
+    : 'Aucun chauffeur actif';
   /* un seul taxi -> on zoome près (rue) ; plusieurs -> on cadre l'ensemble */
   if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
 }

@@ -6,13 +6,12 @@ Branche : `agent/full-ui-ux-overhaul`
 ## Verdict
 
 Le code est désormais **compilable, testable et prêt pour une recette sur
-téléphones réels**. Il n'est pas encore raisonnable d'encaisser de l'argent réel
-tant que les quatre actions de production suivantes ne sont pas terminées :
+téléphones réels**. Le SQL de production et l'Edge Function ont été redéployés
+le 7 août 2026. Il n'est pas encore raisonnable d'encaisser de l'argent réel
+tant que les actions suivantes ne sont pas terminées :
 
-1. exécuter `supabase/INSTALLATION-COMPLETE.sql` sur le projet Supabase ;
-2. redéployer l'Edge Function `rapid-function` ;
-3. activer la protection Supabase Auth contre les mots de passe compromis ;
-4. configurer une nouvelle clé de signature Android privée dans les secrets
+1. activer la protection Supabase Auth contre les mots de passe compromis ;
+2. configurer une nouvelle clé de signature Android privée dans les secrets
    GitHub, puis réussir la recette à deux téléphones de
    `MISE-EN-PRODUCTION.md`.
 
@@ -74,6 +73,7 @@ erDiagram
 | Action | Chauffeur | Patron | Super-admin |
 |---|---:|---:|---:|
 | Modifier son carnet | oui | non | non |
+| Corriger/supprimer une course auditée | non | non | toutes les flottes |
 | Lire une période de recette | soi | chauffeurs de sa flotte si option active | toutes les flottes |
 | Prendre/rendre une plaque | soi | libération de sa flotte | toutes |
 | Envoyer le GPS | soi, pendant sa session | non | non |
@@ -283,8 +283,10 @@ erDiagram
   métadonnée séparée ; une panne fractionnée reste récupérable au redémarrage ;
 - démarrage Android annulé et snapshot effacé si le service natif ne démarre
   pas ;
-- carte live bornée à 40 points par plaque via `positions_live`, sans éviction
-  d'un véhicule retardé par les véhicules plus bavards ;
+- carte live bornée à 40 points par chauffeur actif via `positions_live`, avec
+  un index composite dédié et un état « GPS en attente » sans position fictive ;
+- correction/suppression atomique d'une course par le super-admin, verrou de
+  concurrence, tombstone anti-résurrection et audit dans le schéma privé ;
 - réponse perdue pendant la création flotte + patron traitée comme ambiguë :
   aucune suppression destructive automatique ;
 - dialogues connexion/plaque réellement modaux : fond inert, focus piégé,
@@ -358,7 +360,8 @@ point au lieu d'afficher une fausse précision.
 | Horodatages de session GPS forgés | normalisés/refusés |
 | GPS impossible, futur ou hors session | refusé |
 | Rejeu GPS hors-ligne dans la session | accepté |
-| Carte live avec plaque retardée | présente, limite appliquée par plaque |
+| Carte live avec chauffeur retardé ou sans point | présent, limite par chauffeur |
+| Correction/suppression admin | rôle vérifié, mutation atomique et audit privé |
 | Trois APK debug, build propre | OK |
 | Trois APK release non signées, build propre | OK |
 | Android Lint Vital release | aucun problème |
@@ -382,8 +385,8 @@ présents.
 
 ### P0 — avant argent réel
 
-1. Déployer SQL + Edge Function + nouvelle signature, puis suivre la recette
-   physique de `MISE-EN-PRODUCTION.md`.
+1. Configurer la nouvelle signature, puis suivre la recette physique de
+   `MISE-EN-PRODUCTION.md`.
 2. Comparer plusieurs courses avec un taximètre homologué dans un vrai taxi.
    Le compteur de l'app reste un outil d'appoint ; Bruxelles exige le matériel
    homologué et le ticket réglementaire.

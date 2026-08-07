@@ -1042,7 +1042,8 @@ body.app-admin #cSheet{margin-top:20px}
 body.app-manager #calcCard>h2,
 body.app-admin #calcCard>h2,
 body.app-manager #cSheet>.csec>h3,
-body.app-admin #cSheet>.csec>h3{
+body.app-admin #cSheet>.csec>h3,
+body.app-admin #rideAdminSec .ride-admin-head>h3{
   display:flex;
   align-items:center;
   gap:9px;
@@ -1050,7 +1051,8 @@ body.app-admin #cSheet>.csec>h3{
 body.app-manager #calcCard>h2:before,
 body.app-admin #calcCard>h2:before,
 body.app-manager #cSheet>.csec>h3:before,
-body.app-admin #cSheet>.csec>h3:before{
+body.app-admin #cSheet>.csec>h3:before,
+body.app-admin #rideAdminSec .ride-admin-head>h3:before{
   display:grid;
   flex:none;
   place-items:center;
@@ -1070,6 +1072,10 @@ body.app-manager #cSheet>.csec:nth-child(2)>h3:before,
 body.app-admin #cSheet>.csec:nth-child(2)>h3:before{content:"3"}
 body.app-manager #cResult>h3:before,
 body.app-admin #cResult>h3:before{content:"4"}
+body.app-admin #cSheet>#rideAdminSec>h3:before,
+body.app-admin #cSheet>#rideAdminSec .ride-admin-head>h3:before{content:"3"}
+body.app-admin #cSheet>.csec:nth-child(3)>h3:before{content:"4"}
+body.app-admin #cResult>h3:before{content:"5"}
 body.app-manager .csec,
 body.app-admin .csec{
   margin-top:14px!important;
@@ -1138,6 +1144,76 @@ body.app-admin #platesList,
 body.app-admin #accountsList,
 body.app-admin #cDetail{overflow-x:auto}
 
+body.app-admin .ride-admin-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+body.app-admin .ride-admin-head h3{margin:0!important}
+body.app-admin .ride-admin-list{margin-top:14px}
+body.app-admin .ride-table-scroll{overflow-x:auto}
+body.app-admin .ride-led{min-width:820px}
+body.app-admin .ride-led th:nth-child(3),
+body.app-admin .ride-led td:nth-child(3),
+body.app-admin .ride-led th:nth-child(4),
+body.app-admin .ride-led td:nth-child(4){text-align:left}
+body.app-admin .ride-led th:last-child,
+body.app-admin .ride-led td:last-child{text-align:right}
+body.app-admin .ride-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+  white-space:nowrap;
+}
+body.app-admin .btn.danger{color:var(--danger)!important}
+body.app-admin .btn.danger:hover{border-color:var(--danger)!important;background:#fff1f2!important}
+
+body.app-admin .ride-dialog{
+  width:min(620px,calc(100vw - 32px));
+  max-height:calc(100dvh - 32px);
+  padding:0;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  color:var(--ink);
+  background:var(--surface);
+  box-shadow:0 28px 80px -30px rgba(15,23,42,.7);
+}
+body.app-admin .ride-dialog::backdrop{background:rgba(15,23,42,.62);backdrop-filter:blur(2px)}
+body.app-admin .ride-dialog-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  padding:22px 22px 16px;
+  border-bottom:1px solid var(--line);
+}
+body.app-admin .ride-dialog-head h2{margin:5px 0 3px;font-size:22px;letter-spacing:0}
+body.app-admin .ride-dialog-head p{margin:0;color:var(--muted);font-size:13px}
+body.app-admin .ride-dialog-close{
+  display:grid;
+  flex:none;
+  place-items:center;
+  width:44px;
+  height:44px;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  color:var(--ink);
+  background:var(--surface);
+}
+body.app-admin .ride-dialog-body{padding:20px 22px}
+body.app-admin .ride-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  padding:16px 22px;
+  border-top:1px solid var(--line);
+  background:var(--tr-surface-soft);
+}
+
 /* Traceur GPS : liste de véhicules et carte constituent une seule console. */
 body.app-manager #mapCard,
 body.app-admin #mapCard{
@@ -1150,6 +1226,12 @@ body.app-manager #mapCard>.hint,
 body.app-admin #mapCard>.hint{padding:0 22px;margin-bottom:14px!important}
 body.app-manager #mapCard>.frow,
 body.app-admin #mapCard>.frow{padding:0 22px 16px;margin:0!important}
+.map-toolbar{align-items:flex-end!important;gap:10px!important}
+.map-filter{display:grid;gap:5px;min-width:190px}
+.map-filter.replay-filter{min-width:260px;flex:1}
+.map-filter label{margin:0!important;font-size:11px!important;text-transform:uppercase;letter-spacing:0!important}
+.map-filter select{width:100%;max-width:none!important}
+.map-toolbar #mapStatus{align-self:center;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
 .tracker-list{
   display:flex;
   gap:9px;
@@ -1189,8 +1271,14 @@ body.app-admin #mapCard>.frow{padding:0 22px 16px;margin:0!important}
   background:#d97706;
   box-shadow:0 0 0 4px rgba(217,119,6,.13);
 }
+.tracker-car.offline:disabled{opacity:1!important;cursor:default!important;filter:none!important}
+.tracker-car.offline .tracker-dot{
+  background:#98a2b3;
+  box-shadow:0 0 0 4px rgba(152,162,179,.16);
+}
 .tracker-car strong{font-size:14px;font-weight:700}
 .tracker-car small{color:var(--muted);font-size:12px}
+.map-coords{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;font-variant-numeric:tabular-nums}
 body.app-manager #map,
 body.app-admin #map{
   min-height:460px!important;
@@ -1514,6 +1602,15 @@ body.app-admin #map{
   body.app-manager .row.c3,
   body.app-admin .row.c2,
   body.app-admin .row.c3{grid-template-columns:1fr}
+  .map-toolbar{align-items:stretch!important}
+  .map-filter,.map-filter.replay-filter{min-width:100%;width:100%}
+  .map-toolbar .btn{flex:1}
+  .map-toolbar #mapStatus{width:100%;margin-left:0;white-space:normal}
+  body.app-admin .ride-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+  body.app-admin .ride-dialog-head{padding:18px 16px 14px}
+  body.app-admin .ride-dialog-body{padding:18px 16px}
+  body.app-admin .ride-dialog-actions{padding:14px 16px;flex-direction:column-reverse}
+  body.app-admin .ride-dialog-actions .btn{width:100%}
 }
 @media(max-width:430px){
   body.app-manager #app header.top .btn.ghost,

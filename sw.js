@@ -1,4 +1,4 @@
-const CACHE = 'taxi-recettes-shell-v5-feature-access';
+const CACHE = 'taxi-recettes-shell-v6-admin-supervision';
 const CORE = [
   './',
   './index.html',

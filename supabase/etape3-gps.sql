@@ -21,6 +21,8 @@ alter table public.positions enable row level security;
 create index if not exists positions_fleet_time on public.positions (fleet_id, recorded_at desc);
 create index if not exists positions_plate_time on public.positions (plate_id, recorded_at desc);
 create index if not exists positions_driver_time on public.positions (driver_id, recorded_at desc);
+create index if not exists positions_live_session_time
+  on public.positions (driver_id, plate_id, fleet_id, recorded_at desc, id desc);
 create index if not exists positions_recorded_at_desc on public.positions (recorded_at desc);
 
 -- superadmin : tout
@@ -66,8 +68,8 @@ create policy positions_patron_read on public.positions
     )
   );
 
--- Carte live : retourne un nombre borné de points PAR plaque. Une limite
--- globale évincerait les véhicules dont le dernier point est moins récent.
+-- Carte live : part des sessions actives et cherche directement les derniers
+-- points de chaque chauffeur. Le LEFT JOIN conserve aussi « GPS en attente ».
 create or replace function public.positions_live(
   p_fleet uuid default null,
   p_points integer default 40
@@ -91,30 +93,29 @@ as $$
   with caller as materialized (
     select public.my_role() as role, public.my_fleet() as fleet_id
   ),
-  ranked as (
+  active_sessions as materialized (
     select
-      pos.*,
-      row_number() over (
-        partition by pos.plate_id
-        order by pos.recorded_at desc, pos.id desc
-      ) as point_rank
-    from public.positions pos
+      s.id,
+      s.plate_id,
+      s.fleet_id,
+      s.driver_id,
+      s.started_at
+    from public.plate_sessions s
     cross join caller c
-    where pos.plate_id is not null
-      and pos.recorded_at >= now() - interval '10 minutes'
+    where s.ended_at is null
       and (
         (
           c.role = 'superadmin'
-          and (p_fleet is null or pos.fleet_id = p_fleet)
+          and (p_fleet is null or s.fleet_id = p_fleet)
         )
         or (
           c.role = 'patron'
-          and pos.fleet_id = c.fleet_id
+          and s.fleet_id = c.fleet_id
           and (p_fleet is null or p_fleet = c.fleet_id)
           and exists (
             select 1
             from public.fleets f
-            where f.id = pos.fleet_id
+            where f.id = s.fleet_id
               and not f.suspended
               and (f.opt_gps_live or f.opt_replay)
           )
@@ -122,20 +123,33 @@ as $$
       )
   )
   select
-    r.plate_id,
-    r.fleet_id,
-    r.driver_id,
-    r.lat,
-    r.lng,
-    r.accuracy,
-    r.recorded_at,
+    s.plate_id,
+    s.fleet_id,
+    s.driver_id,
+    pos.lat,
+    pos.lng,
+    pos.accuracy,
+    pos.recorded_at,
     pl.label,
     coalesce(nullif(pr.display_name, ''), pr.username)
-  from ranked r
-  join public.plates pl on pl.id = r.plate_id
-  left join public.profiles pr on pr.id = r.driver_id
-  where r.point_rank <= least(greatest(coalesce(p_points, 40), 1), 100)
-  order by r.recorded_at desc, r.plate_id
+  from active_sessions s
+  left join lateral (
+    select p.lat, p.lng, p.accuracy, p.recorded_at
+    from public.positions p
+    where p.driver_id = s.driver_id
+      and p.plate_id = s.plate_id
+      and p.fleet_id = s.fleet_id
+      and p.recorded_at >= greatest(
+        s.started_at - interval '5 minutes',
+        now() - interval '10 minutes'
+      )
+      and p.recorded_at <= now() + interval '5 minutes'
+    order by p.recorded_at desc, p.id desc
+    limit least(greatest(coalesce(p_points, 40), 1), 100)
+  ) pos on true
+  join public.plates pl on pl.id = s.plate_id
+  left join public.profiles pr on pr.id = s.driver_id
+  order by pos.recorded_at desc nulls last, s.plate_id
 $$;
 
 revoke all on function public.positions_live(uuid, integer) from public, anon;

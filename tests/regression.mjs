@@ -89,6 +89,12 @@ const patronFeaturesCtx=compile(
   ['fleetFeatures','patronSectionAllowed'],
   '({fleetFeatures,patronSectionAllowed})'
 );
+const adminRideEditCtx=compile(
+  admin,
+  ['parseAdminDecimal','normalizeAdminRideInput'],
+  'normalizeAdminRideInput'
+);
+const adminLiveMapCtx=compile(admin,['liveDriverGroups'],'liveDriverGroups');
 
 const featureCases=[
   [null,{recettes:false,gpsLive:false,replay:false,carte:false}],
@@ -121,6 +127,34 @@ assert.equal(patchRequest.options.headers.Prefer,'return=representation');
 patchResponse={ok:true,data:[]};
 assert.equal(await adminPatchCtx.__tested('fleet-a',{opt_recettes:true}),null);
 assert.equal(fleetError.textContent,'Échec de l\'enregistrement.');
+
+const validAdminRide=adminRideEditCtx.__tested({
+  time:'14:25',amount:'1.234,56',source:'prive',sourceName:'Course privée',
+  pay:'cash',rate:'12,5',cash:''
+});
+assert.equal(validAdminRide.ok,true);
+assert.equal(validAdminRide.ride.amt,1234.56);
+assert.equal(validAdminRide.ride.rate,12.5);
+const validAppCashRide=adminRideEditCtx.__tested({
+  time:'',amount:'500',source:'uber',sourceName:'Uber',pay:'appcash',rate:'30',cash:'125,50'
+});
+assert.equal(validAppCashRide.ok,true);
+assert.equal(validAppCashRide.ride.rate,0);
+assert.equal(validAppCashRide.ride.cash,125.5);
+assert.equal(adminRideEditCtx.__tested({time:'25:00',amount:'50',source:'x',pay:'cash',rate:'0'}).ok,false);
+assert.equal(adminRideEditCtx.__tested({time:'10:00',amount:'50',source:'x',pay:'appcash',rate:'0',cash:'60'}).ok,false);
+
+const liveGroups=adminLiveMapCtx.__tested([
+  {driver_id:'driver-a',plate_id:'plate-a',driver_name:'A',lat:50.8,lng:4.3,recorded_at:'2026-08-07T10:00:00Z'},
+  {driver_id:'driver-a',plate_id:'plate-a',driver_name:'A',lat:50.7,lng:4.2,recorded_at:'2026-08-07T09:59:00Z'},
+  {driver_id:'driver-b',plate_id:'plate-b',driver_name:'B',lat:null,lng:null,recorded_at:null}
+]);
+assert.equal(liveGroups.length,2);
+assert.equal(liveGroups[0].key,'driver-a');
+assert.equal(liveGroups[0].points.length,2);
+assert.equal(liveGroups[0].latest.lat,50.8);
+assert.equal(liveGroups[1].key,'driver-b');
+assert.equal(liveGroups[1].latest,null);
 
 const moneyInputCases=[
   ['',null],
@@ -248,6 +282,12 @@ assert.equal((patron.match(/data-feature="carte"/g)||[]).length,2);
 assert.match(patron,/setInterval\(refreshPatronFeatures,15000\)/);
 assert.match(patron,/window\.addEventListener\('focus',refreshPatronFeatures\)/);
 assert.match(admin,/'Prefer':'return=representation'/);
+assert.match(admin,/\/rest\/v1\/rpc\/admin_ride_mutation/);
+assert.match(admin,/id="cRideAdminList"/);
+assert.match(admin,/id="rideEditDialog"/);
+assert.match(admin,/value="">Toutes les flottes<\/option>/);
+assert.match(admin,/id="mapFitBtn"/);
+assert.match(admin,/function liveDriverGroups\(/);
 for(const html of [patron,admin]){
   assert.match(html,/id="cSumup"/);
   assert.match(html,/id="cTaxiCheque"/);
@@ -310,7 +350,10 @@ console.log(JSON.stringify({
   androidStartRollback:true,
   syncGuards:true,
   modalFocusManaged:true,
-  liveMapUsesPerPlateRpc:true,
+  adminRideEditing:true,
+  adminRideValidation:true,
+  liveMapUsesPerDriverRpc:true,
+  liveMapShowsPendingDrivers:true,
   ambiguousCreatePreserved:true,
   uiSystem:true,
   androidWebViewIsolated:true
