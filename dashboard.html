@@ -3,44 +3,170 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Taxi Recettes — Espaces</title>
+<meta name="theme-color" content="#0F172A">
+<title>Taxi Recettes — Choisir un espace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#FAF5EC; --surface:#FFF; --ink:#241C12; --muted:#7C6F5B; --brand:#B14A28; --line:#EAE0CE;
-    --serif:"Fraunces",Georgia,serif; --sans:"Inter",ui-sans-serif,system-ui,sans-serif; }
-  @media (prefers-color-scheme:dark){ :root{ --bg:#17130E; --surface:#201A12; --ink:#F0E9DC; --muted:#A99A82; --brand:#D2622F; --line:#33291B; } }
-  *{box-sizing:border-box} body{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;
-    background:var(--bg);color:var(--ink);font-family:var(--sans)}
-  .box{width:100%;max-width:400px;text-align:center}
-  .m{width:56px;height:56px;border-radius:15px;background:var(--brand);color:#fff;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
-  h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0 0 4px}
-  p{color:var(--muted);margin:0 0 22px}
-  a.choice{display:flex;align-items:center;gap:12px;text-align:left;text-decoration:none;color:var(--ink);
-    background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;font-weight:600;font-size:16px}
-  a.choice:hover{border-color:var(--brand)}
-  a.choice .ico{font-size:22px}
-  a.choice .sub{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:2px}
-  .small{font-size:13px;color:var(--muted);margin-top:6px}
+  :root{
+    color-scheme:light;
+    --bg:#F4F6F9;--surface:#FFFFFF;--surface2:#F8FAFC;--text:#101828;
+    --muted:#667085;--brand:#0F172A;--brand-dark:#08111F;--line:#DBE1EA;
+    --focus:#1D4ED8;--shadow:0 24px 60px -38px rgba(15,23,42,.55);
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+    --display:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      color-scheme:dark;--bg:#07101D;--surface:#101B2B;--surface2:#152235;
+      --text:#F2F5F9;--muted:#A6B3C5;--brand:#F5B700;--brand-dark:#08111F;
+      --line:#2A384C;--focus:#60A5FA;--shadow:0 24px 60px -34px #000;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100dvh;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));
+    display:grid;place-items:center;color:var(--text);font:16px/1.5 var(--sans);
+    background:
+      radial-gradient(circle at 12% 0,rgba(29,78,216,.12),transparent 28rem),
+      radial-gradient(circle at 100% 100%,rgba(245,183,0,.12),transparent 24rem),
+      var(--bg);
+  }
+  .shell{width:min(100%,960px)}
+  .brand{display:flex;align-items:center;gap:13px;margin:0 0 28px}
+  .logo{
+    width:48px;height:48px;display:grid;place-items:center;border-radius:15px;
+    color:#08111F;background:#F5B700;
+    box-shadow:0 14px 28px -18px rgba(161,98,7,.9);
+  }
+  .brand strong{display:block;font:700 18px/1.2 var(--display)}
+  .brand span{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+  .panel{
+    display:grid;grid-template-columns:minmax(260px,.8fr) minmax(360px,1.2fr);
+    overflow:hidden;background:var(--surface);border:1px solid var(--line);
+    border-radius:24px;box-shadow:var(--shadow);
+  }
+  .intro{
+    padding:clamp(28px,5vw,54px);color:#FFF;
+    background:
+      linear-gradient(160deg,rgba(255,255,255,.08),transparent 45%),
+      #08111F;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:7px;margin:0 0 18px;padding:5px 9px;
+    border:1px solid rgba(255,255,255,.2);border-radius:999px;color:#FDE68A;
+    font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  }
+  .eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:#4ADE80}
+  h1{font:700 clamp(30px,4vw,44px)/1.08 var(--display);letter-spacing:-.04em;margin:0 0 16px}
+  .intro p{color:#B8C6D9;margin:0;max-width:34ch}
+  .privacy{display:flex;gap:9px;align-items:flex-start;margin-top:34px;color:#AEBBD0;font-size:13px}
+  .choices{padding:clamp(24px,4.5vw,48px)}
+  .choices h2{font:700 20px/1.25 var(--display);letter-spacing:-.025em;margin:0 0 5px}
+  .choices>p{color:var(--muted);margin:0 0 21px}
+  .choice{
+    min-height:82px;display:grid;grid-template-columns:46px 1fr 24px;align-items:center;gap:14px;
+    padding:15px;margin-top:11px;text-decoration:none;color:var(--text);
+    background:var(--surface2);border:1px solid var(--line);border-radius:16px;
+    transition:border-color .16s,transform .16s,box-shadow .16s;
+  }
+  .choice:hover{border-color:#98A2B3;transform:translateY(-1px);box-shadow:0 12px 26px -22px rgba(15,23,42,.7)}
+  .choice:focus-visible{outline:3px solid color-mix(in srgb,var(--focus) 32%,transparent);outline-offset:2px}
+  .icon{
+    width:46px;height:46px;display:grid;place-items:center;border-radius:13px;
+    color:#1D4ED8;background:#EAF1FF;
+  }
+  .choice:nth-of-type(1) .icon{color:#6D4AFF;background:#EFECFF}
+  .choice:nth-of-type(2) .icon{color:#1D4ED8;background:#EAF1FF}
+  .choice:nth-of-type(3) .icon{color:#7A5200;background:#FFF4C2}
+  .choice strong{display:block;font:700 15px/1.3 var(--display)}
+  .choice small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+  .arrow{color:var(--muted)}
+  .foot{color:var(--muted);font-size:12px;margin:19px 2px 0}
+  @media(max-width:720px){
+    body{display:block}
+    .shell{margin:0 auto}
+    .brand{margin-bottom:18px}
+    .panel{grid-template-columns:1fr;border-radius:20px}
+    .intro{padding:28px}
+    .intro p{max-width:none}
+    .privacy{margin-top:22px}
+    .choices{padding:25px 20px 28px}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-  <div class="box">
-    <div class="m"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
-    <h1>Taxi Recettes</h1>
-    <p>Choisis ton espace</p>
-    <a class="choice" href="admin.html"><span class="ico">👑</span><span>Super-Admin<span class="sub">Flottes, options, comptes</span></span></a>
-    <a class="choice" href="patron.html"><span class="ico">🏢</span><span>Patron de flotte<span class="sub">Plaques, carte GPS, réglages, chauffeurs</span></span></a>
-    <p class="small">🚕 Chauffeur ? Utilise l'application mobile.</p>
+<main class="shell">
+  <div class="brand" role="img" aria-label="Taxi Recettes">
+    <div class="logo" aria-hidden="true">
+      <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 17H3v-4.2c0-.9.6-1.7 1.5-1.9L6 7.5A2.5 2.5 0 0 1 8.3 6h7.4A2.5 2.5 0 0 1 18 7.5l1.5 3.4c.9.2 1.5 1 1.5 1.9V17h-2"/>
+        <path d="M8 17h8M6.5 11h11"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+      </svg>
+    </div>
+    <div><strong>Taxi Recettes</strong><span>Gestion de flotte · Bruxelles</span></div>
   </div>
+
+  <section class="panel">
+    <div class="intro">
+      <div class="eyebrow">Plateforme sécurisée</div>
+      <h1>Votre activité, au bon endroit.</h1>
+      <p>Chaque rôle ouvre un espace adapté au terrain, avec les mêmes données et les mêmes calculs.</p>
+      <div class="privacy">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>
+        </svg>
+        <span>Accès isolés par flotte et historique GPS limité.</span>
+      </div>
+    </div>
+
+    <div class="choices">
+      <h2>Choisissez votre espace</h2>
+      <p>Vous serez redirigé vers votre tableau de bord.</p>
+
+      <a class="choice" href="admin.html">
+        <span class="icon" aria-hidden="true">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12h6M12 9v6"/>
+          </svg>
+        </span>
+        <span><strong>Super-administrateur</strong><small>Flottes, droits, comptes et supervision</small></span>
+        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+
+      <a class="choice" href="patron.html">
+        <span class="icon" aria-hidden="true">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h1m4 0h1m-6 4h1m4 0h1m-4 7v-3h2v3"/>
+          </svg>
+        </span>
+        <span><strong>Patron de flotte</strong><small>Recettes, plaques, chauffeurs et carte GPS</small></span>
+        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+
+      <a class="choice" href="index.html">
+        <span class="icon" aria-hidden="true">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 18h6"/>
+          </svg>
+        </span>
+        <span><strong>Chauffeur</strong><small>Carnet hors-ligne et taximètre</small></span>
+        <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+
+      <p class="foot">La session existante est reconnue automatiquement sur cet appareil.</p>
+    </div>
+  </section>
+</main>
 <script>
-/* Si déjà connecté, aiguille directement vers le bon espace */
 try{
   var s=JSON.parse(localStorage.getItem('taxiDashAuthV1')||'null');
   var r=s&&s.profile&&s.profile.role;
   if(r==='superadmin') location.replace('admin.html');
   else if(r==='patron') location.replace('patron.html');
-}catch(e){}
+}catch(_){}
 </script>
 </body>
 </html>

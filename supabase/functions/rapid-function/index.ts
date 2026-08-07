@@ -1,11 +1,11 @@
-// Edge Function : gestion des comptes (create / delete / password)
+// Edge Function « rapid-function » : gestion des comptes (create / delete / password)
 // Déployée côté Supabase sous le slug "rapid-function".
 // Sécurité :
 //  - superadmin : crée/supprime/réinitialise n'importe quel compte, dans n'importe quelle flotte.
 //  - patron     : crée/supprime/réinitialise uniquement des CHAUFFEURS de SA flotte.
 // La clé service_role reste côté serveur.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.9";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +34,11 @@ Deno.serve(async (req) => {
   if (cErr || !caller?.user) return json({ error: "auth" }, 401);
   const { data: me } = await admin.from("profiles").select("role, fleet_id, active").eq("id", caller.user.id).single();
   if (!me || !me.active) return json({ error: "forbidden" }, 403);
+  if (me.role === "patron") {
+    if (!me.fleet_id) return json({ error: "patron_sans_flotte" }, 403);
+    const { data: fleet } = await admin.from("fleets").select("suspended").eq("id", me.fleet_id).single();
+    if (!fleet || fleet.suspended) return json({ error: "flotte_suspendue" }, 403);
+  }
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "json" }, 400); }
@@ -47,28 +52,29 @@ Deno.serve(async (req) => {
     let fleet_id: string | null = body.fleet_id ?? null;
 
     if (!okUsername(username)) return json({ error: "username_invalide" }, 400);
-    if (password.length < 6) return json({ error: "mdp_court" }, 400);
+    if (password.length < 10) return json({ error: "mdp_court" }, 400);
     if (!["patron", "chauffeur"].includes(role)) return json({ error: "role" }, 400);
 
     if (me.role === "superadmin") { /* peut tout */ }
     else if (me.role === "patron") {
       if (role !== "chauffeur") return json({ error: "patron_role" }, 403);
       fleet_id = me.fleet_id;
-      if (!fleet_id) return json({ error: "patron_sans_flotte" }, 403);
     } else return json({ error: "forbidden" }, 403);
 
     const email = `${username}@${DOMAIN}`;
     const { data: created, error: uErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
     if (uErr || !created?.user) {
       if (/already/i.test(String(uErr?.message || ""))) return json({ error: "identifiant_pris" }, 409);
-      return json({ error: "create_failed", detail: String(uErr?.message || "") }, 400);
+      console.error("create_failed", String(uErr?.message || ""));
+      return json({ error: "create_failed" }, 400);
     }
     const display_name = (String(body.display_name || username).replace(/[<>]/g, "").trim().slice(0, 60)) || username;
     const { error: pErr } = await admin.from("profiles").insert({ id: created.user.id, username, display_name, role, fleet_id });
     if (pErr) {
       await admin.auth.admin.deleteUser(created.user.id);
       if (/duplicate|unique/i.test(pErr.message)) return json({ error: "identifiant_pris" }, 409);
-      return json({ error: "profile_failed", detail: pErr.message }, 400);
+      console.error("profile_failed", pErr.message);
+      return json({ error: "profile_failed" }, 400);
     }
     return json({ ok: true, username, role, fleet_id, login: email });
   }
@@ -107,9 +113,12 @@ Deno.serve(async (req) => {
 
     // password
     const pw = String(body.password || "");
-    if (pw.length < 6) return json({ error: "mdp_court" }, 400);
+    if (pw.length < 10) return json({ error: "mdp_court" }, 400);
     const { error } = await admin.auth.admin.updateUserById(targetId, { password: pw });
-    if (error) return json({ error: "password_failed", detail: error.message }, 400);
+    if (error) {
+      console.error("password_failed", error.message);
+      return json({ error: "password_failed" }, 400);
+    }
     return json({ ok: true });
   }
 

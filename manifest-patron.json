@@ -1,0 +1,28 @@
+{
+  "id": "./patron.html",
+  "name": "Taxi Recettes Patron",
+  "short_name": "Taxi Patron",
+  "description": "Recettes, chauffeurs, plaques et suivi GPS de la flotte.",
+  "lang": "fr-BE",
+  "start_url": "./patron.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FAF5EC",
+  "theme_color": "#123B73",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "icons/taxi-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/taxi-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

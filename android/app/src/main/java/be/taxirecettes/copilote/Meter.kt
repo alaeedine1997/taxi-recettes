@@ -2,12 +2,6 @@ package be.taxirecettes.copilote
 
 import android.content.Context
 import org.json.JSONObject
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Cœur du taximètre. C'est un singleton partagé entre le service natif (GPS en
@@ -30,6 +24,7 @@ object Meter {
     private var saut = 0.10
     private var vitesseMinRoule = 3.0
     private var precisionMax = 25.0
+    private var nightApplied = false
 
     // état de la course
     @Volatile private var total = 0.0
@@ -46,31 +41,26 @@ object Meter {
     fun start(tariffs: String) {
         try {
             val o = JSONObject(tariffs)
-            priseEnCharge = o.optDouble("priseEnCharge", 2.60)
-            tarifKm = o.optDouble("tarifKm", 2.30)
-            tarifMinute = o.optDouble("tarifMinute", 0.60)
-            minimumCourse = o.optDouble("minimumCourse", 8.00)
+            priseEnCharge = o.optDouble("priseEnCharge", 2.60).coerceIn(0.0, 100.0)
+            tarifKm = o.optDouble("tarifKm", 2.30).coerceIn(0.0, 20.0)
+            tarifMinute = o.optDouble("tarifMinute", 0.60).coerceIn(0.0, 10.0)
+            minimumCourse = o.optDouble("minimumCourse", 8.00).coerceIn(0.0, 200.0)
             val s = o.optDouble("sautCompteur", 0.10)
-            saut = if (s > 0) s else 0.10
-            vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0)
-            precisionMax = o.optDouble("precisionMax", 25.0)
+            saut = if (s > 0) s.coerceAtMost(10.0) else 0.10
+            vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0).coerceIn(0.0, 100.0)
+            precisionMax = o.optDouble("precisionMax", 25.0).coerceIn(5.0, 200.0)
+            nightApplied = o.optBoolean("applyNight", false)
+            val supplementNuit = o.optDouble("supplementNuit", 2.0).coerceIn(0.0, 50.0)
+            total = priseEnCharge + if (nightApplied) supplementNuit else 0.0
         } catch (_: Exception) {
+            nightApplied = false
+            total = priseEnCharge
         }
-        total = priseEnCharge
         distanceM = 0.0
         tarifNow = "km"
         hasLast = false
         startAt = System.currentTimeMillis()
         running = true
-    }
-
-    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) +
-            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
-        return 2 * r * asin(sqrt(a))
     }
 
     @Synchronized
@@ -80,22 +70,25 @@ object Meter {
         if (hasLast) {
             val dt = (t - lastT) / 1000.0
             if (dt > 0) {
-                var dd = haversine(lastLat, lastLon, lat, lon)
-                if ((dd / dt) * 3.6 < vitesseMinRoule) dd = 0.0   // à l'arrêt : anti-dérive GPS
-                distanceM += dd
-                val compKm = tarifKm * (dd / 1000.0)
-                val compMin = tarifMinute * (dt / 60.0)
-                total += max(compKm, compMin)
-                tarifNow = if (compMin > compKm) "temps" else "km"
+                val increment = MeterMath.increment(
+                    lastLat, lastLon, lat, lon, dt,
+                    tarifKm, tarifMinute, vitesseMinRoule
+                )
+                if (!increment.accepted) return
+                distanceM += increment.distanceM
+                total += increment.charge
+                tarifNow = increment.tariff
             }
         }
         lastLat = lat; lastLon = lon; lastT = t; hasLast = true
     }
 
-    private fun roundSaut(p: Double): Double = Math.round(p / saut) * saut
+    private fun roundSaut(p: Double): Double = MeterMath.roundJump(p, saut)
 
     fun livePrice(): Double = roundSaut(total)
-    private fun finalPrice(): Double = roundSaut(max(total, minimumCourse))
+    /* Même ordre que le web : saut d'abord, minimum ensuite. Arrondir le minimum
+       au saut pouvait faire repasser le montant final sous le minimum configuré. */
+    private fun finalPrice(): Double = MeterMath.finalPrice(total, minimumCourse, saut)
     fun km(): Double = Math.round(distanceM / 10.0) / 100.0
     fun seconds(): Long = if (startAt == 0L) 0 else (System.currentTimeMillis() - startAt) / 1000
 
@@ -105,6 +98,7 @@ object Meter {
         put("km", km())
         put("seconds", seconds())
         put("tarif", tarifNow)
+        put("nightApplied", nightApplied)
     }.toString()
 
     @Synchronized
@@ -135,7 +129,7 @@ object Meter {
                 .put("tarifMinute", tarifMinute).put("minimumCourse", minimumCourse)
                 .put("saut", saut).put("vitesseMinRoule", vitesseMinRoule).put("precisionMax", precisionMax)
                 .put("total", total).put("distanceM", distanceM).put("startAt", startAt)
-                .put("tarifNow", tarifNow)
+                .put("tarifNow", tarifNow).put("nightApplied", nightApplied)
                 .put("lastLat", lastLat).put("lastLon", lastLon).put("lastT", lastT).put("hasLast", hasLast)
             ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("s", o.toString()).apply()
         } catch (_: Exception) {}
@@ -148,18 +142,16 @@ object Meter {
             val s = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("s", null) ?: return false
             val o = JSONObject(s)
             if (!o.optBoolean("running", false)) return false
-            // Course trop ancienne (service relancé bien plus tard, ou vieux snapshot) :
-            // on l'abandonne au lieu de facturer tout le temps écoulé pendant le kill.
-            val lastTs = o.optLong("lastT", 0L)
-            if (lastTs > 0L && System.currentTimeMillis() - lastTs > 5 * 60 * 1000L) {
-                clearSnapshot(ctx); return false
-            }
+            /* Même un snapshot ancien représente de l'argent réel : on restaure la
+               course, mais hasLast=false ci-dessous garantit que le temps et la
+               distance de la coupure ne sont jamais facturés. */
             priseEnCharge = o.optDouble("priseEnCharge", 2.60); tarifKm = o.optDouble("tarifKm", 2.30)
             tarifMinute = o.optDouble("tarifMinute", 0.60); minimumCourse = o.optDouble("minimumCourse", 8.00)
             saut = o.optDouble("saut", 0.10).let { if (it > 0) it else 0.10 }
             vitesseMinRoule = o.optDouble("vitesseMinRoule", 3.0); precisionMax = o.optDouble("precisionMax", 25.0)
             total = o.optDouble("total", priseEnCharge); distanceM = o.optDouble("distanceM", 0.0)
             startAt = o.optLong("startAt", System.currentTimeMillis()); tarifNow = o.optString("tarifNow", "km")
+            nightApplied = o.optBoolean("nightApplied", false)
             lastLat = o.optDouble("lastLat", 0.0); lastLon = o.optDouble("lastLon", 0.0)
             // On NE facture PAS le trou du kill : le prochain point GPS ré-amorce la
             // position (hasLast=false) au lieu de compter dt sur toute la coupure.

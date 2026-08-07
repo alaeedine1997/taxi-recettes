@@ -66,7 +66,7 @@ as $$
         )
       )
       -- le chauffeur : son propre carnet
-      or p_driver = auth.uid()
+      or (p_driver = auth.uid() and public.my_role_sd() = 'chauffeur')
     )
 $$;
 

@@ -7,8 +7,22 @@
 -- Helper : fleet_id du chauffeur/patron courant (security definer → contourne la RLS de profiles)
 create or replace function public.my_fleet()
 returns uuid
-language sql stable security definer set search_path = public
-as $$ select fleet_id from public.profiles where id = auth.uid() $$;
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select p.fleet_id
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 -- ---------------------------------------------------------------------
 --  Table des plaques (une plaque appartient à une flotte)
@@ -75,7 +89,8 @@ create policy psess_patron_read on public.plate_sessions
 drop policy if exists psess_driver_insert on public.plate_sessions;
 create policy psess_driver_insert on public.plate_sessions
   for insert with check (
-    driver_id = auth.uid()
+    public.my_role() = 'chauffeur'
+    and driver_id = auth.uid()
     and fleet_id = public.my_fleet()
     and exists (
       select 1 from public.plates p
@@ -96,32 +111,49 @@ create policy psess_patron_update on public.plate_sessions
   for update using (public.my_role() = 'patron' and fleet_id = public.my_fleet())
   with check (public.my_role() = 'patron' and fleet_id = public.my_fleet());
 
--- IMMUABILITÉ : sur une session, seul ended_at est modifiable (check-out). Empêche de réécrire
--- plate_id / driver_id / fleet_id / started_at par une requête PostgREST forgée (le WITH CHECK ne voit pas OLD).
+-- TEMPS SERVEUR + IMMUTABILITÉ : un client ne choisit ni started_at, ni la
+-- date de clôture. Une session clôturée ne peut plus être antidatée/prolongée
+-- pour élargir artificiellement la fenêtre d'insertion GPS.
 create or replace function public.plate_session_lock_cols()
 returns trigger language plpgsql as $$
 begin
+  if current_user in ('postgres', 'service_role', 'supabase_admin') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.started_at := now();
+    new.ended_at := null;
+    return new;
+  end if;
+
   if new.plate_id  is distinct from old.plate_id
   or new.driver_id is distinct from old.driver_id
   or new.fleet_id  is distinct from old.fleet_id
   or new.started_at is distinct from old.started_at then
     raise exception 'plate_sessions : seul ended_at est modifiable';
   end if;
-  -- ended_at est UNIDIRECTIONNEL : on peut clôturer (NULL→date) mais pas ré-ouvrir (date→NULL).
-  -- Sinon un chauffeur ressusciterait sa session close sur une plaque désactivée / annulerait une libération patron.
-  if old.ended_at is not null and new.ended_at is null then
-    raise exception 'plate_sessions : une session close ne peut pas être rouverte (reprends la plaque)';
+  if old.ended_at is not null and new.ended_at is distinct from old.ended_at then
+    raise exception 'plate_sessions : une session clôturée est immuable';
+  end if;
+  if old.ended_at is null and new.ended_at is not null then
+    new.ended_at := greatest(now(), old.started_at);
   end if;
   return new;
 end $$;
 drop trigger if exists plate_session_lock on public.plate_sessions;
-create trigger plate_session_lock before update on public.plate_sessions
+create trigger plate_session_lock before insert or update on public.plate_sessions
   for each row execute function public.plate_session_lock_cols();
 
 -- chauffeur : relit ses propres sessions
 drop policy if exists psess_driver_read on public.plate_sessions;
 create policy psess_driver_read on public.plate_sessions
-  for select using (driver_id = auth.uid());
+  for select
+  to authenticated
+  using (
+    driver_id = auth.uid()
+    and (ended_at is null or public.my_role() = 'chauffeur')
+  );
 
 -- =====================================================================
 --  (Optionnel) Jeu de test pour valider tout de suite :

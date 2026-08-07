@@ -6,6 +6,7 @@ on:
     paths:
       - 'android/**'
       - 'index.html'
+      - 'ui-system.css'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -17,33 +18,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Composants SDK
         run: |
           yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" >/dev/null 2>&1 || true
 
       - name: Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.7'
 
       - name: Synchroniser la page embarquee du chauffeur
         run: |
           grep -v 'rel="manifest"' index.html > android/app/src/main/assets/webapp/index.html
+          cp ui-system.css android/app/src/main/assets/webapp/ui-system.css
           echo "asset synchronise : $(wc -c < android/app/src/main/assets/webapp/index.html) octets"
+
+      - name: Préparer la signature privée
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for secret in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!secret}" || { echo "::error::Secret $secret manquant"; exit 1; }
+          done
+          mkdir -p "$RUNNER_TEMP/taxi-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/taxi-signing/release.keystore"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/taxi-signing/release.keystore" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" >/dev/null
 
       - name: Construire les 3 APK (release)
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/taxi-signing/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Préparer les APK
@@ -54,7 +78,7 @@ jobs:
           ls -lh taxi-*.apk
 
       - name: Artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: taxi-apks
           path: |
@@ -63,7 +87,7 @@ jobs:
             taxi-admin.apk
 
       - name: Publier la release (téléchargeable sur le téléphone)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: apk-latest
           name: Taxi — 3 APK (chauffeur, patron, admin)

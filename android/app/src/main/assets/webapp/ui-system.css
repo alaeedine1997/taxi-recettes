@@ -1,0 +1,1726 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+/*
+ * TAXI RECETTES — SYSTÈME VISUEL FINAL
+ * Un langage commun, trois postes de travail :
+ * - chauffeur : cockpit mobile, gestes courts, actions larges ;
+ * - patron : centre opérationnel, GPS et règlements ;
+ * - super admin : console réseau dense et contrôlée.
+ */
+
+:root{
+  --tr-font:"IBM Plex Sans",Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --tr-navy-950:#08111f;
+  --tr-navy-900:#0f172a;
+  --tr-navy-800:#17233a;
+  --tr-yellow:#f5b700;
+  --tr-yellow-soft:#fff4c2;
+  --tr-blue:#1d4ed8;
+  --tr-blue-soft:#eaf1ff;
+  --tr-violet:#6d4aff;
+  --tr-violet-soft:#efecff;
+  --tr-canvas:#f4f6f9;
+  --tr-surface:#ffffff;
+  --tr-surface-soft:#f8fafc;
+  --tr-text:#101828;
+  --tr-muted:#667085;
+  --tr-line:#dbe1ea;
+  --tr-success:#15803d;
+  --tr-warning:#a16207;
+  --tr-danger:#c0262d;
+  --tr-radius-sm:10px;
+  --tr-radius-md:16px;
+  --tr-radius-lg:24px;
+  --tr-shadow-sm:0 1px 2px rgba(15,23,42,.05);
+  --tr-shadow-md:0 14px 34px -24px rgba(15,23,42,.38),0 1px 2px rgba(15,23,42,.05);
+  --tr-ease:cubic-bezier(.2,.8,.2,1);
+  --tr-z-base:0;
+  --tr-z-sticky:20;
+  --tr-z-nav:40;
+  --tr-z-modal:100;
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  font-family:var(--tr-font)!important;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit}
+button,[role="button"],.btn,.chip,.tracker-car{cursor:pointer;touch-action:manipulation}
+button:disabled,.btn:disabled{cursor:not-allowed!important;opacity:.46!important;filter:saturate(.4)}
+svg{flex:none}
+table{font-variant-numeric:tabular-nums}
+:focus-visible{
+  outline:3px solid rgba(29,78,216,.34)!important;
+  outline-offset:3px!important;
+}
+::selection{background:var(--tr-yellow-soft);color:var(--tr-navy-950)}
+.hidden{display:none!important}
+.skip-link{
+  position:fixed;
+  z-index:1000;
+  top:10px;
+  left:10px;
+  padding:10px 14px;
+  border-radius:9px;
+  color:#fff;
+  background:var(--tr-navy-900);
+  font-size:14px;
+  font-weight:700;
+  text-decoration:none;
+  transform:translateY(-160%);
+  transition:transform .18s var(--tr-ease);
+}
+.skip-link:focus{transform:translateY(0)}
+
+/* ==========================================================================
+   CHAUFFEUR — cockpit mobile
+   ========================================================================== */
+
+body.app-driver{
+  --bg:var(--tr-canvas)!important;
+  --surface:var(--tr-surface)!important;
+  --surface2:var(--tr-surface-soft)!important;
+  --text:var(--tr-text)!important;
+  --text2:var(--tr-muted)!important;
+  --primary:var(--tr-navy-900)!important;
+  --on-primary:#fff!important;
+  --accent:var(--tr-yellow)!important;
+  --accent-press:#d99f00!important;
+  --on-accent:var(--tr-navy-950)!important;
+  --border:var(--tr-line)!important;
+  --danger:var(--tr-danger)!important;
+  --chip-bg:#edf1f6!important;
+  --shadow:var(--tr-shadow-md)!important;
+  min-height:100dvh;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+  background:
+    linear-gradient(180deg,#eaf0f8 0,#f4f6f9 270px,var(--tr-canvas) 100%)!important;
+  color:var(--text)!important;
+}
+
+body.app-driver header.app{
+  min-height:70px;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px!important;
+  background:rgba(8,17,31,.97)!important;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  box-shadow:0 14px 30px -26px #000;
+  backdrop-filter:blur(16px);
+}
+body.app-driver header.app>svg{
+  width:40px;
+  height:40px;
+  padding:9px;
+  border-radius:12px;
+  color:var(--tr-navy-950);
+  background:var(--tr-yellow);
+}
+body.app-driver header.app h1{
+  color:#fff;
+  font-size:17px;
+  font-weight:700;
+  letter-spacing:-.02em;
+}
+body.app-driver header.app .sub{
+  max-width:48%;
+  min-height:30px;
+  margin-left:auto!important;
+  padding:5px 9px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  color:#dce5f2;
+  background:rgba(255,255,255,.06);
+  font-size:11.5px;
+  font-weight:600;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+body.app-driver .livedot{
+  width:7px;
+  height:7px;
+  background:#4ade80;
+  box-shadow:0 0 0 4px rgba(74,222,128,.14);
+}
+body.app-driver>.wrap{
+  width:100%;
+  max-width:720px!important;
+  padding:0 12px calc(104px + env(safe-area-inset-bottom))!important;
+}
+body.app-driver .view.on{
+  animation:tr-view-in .22s var(--tr-ease);
+}
+@keyframes tr-view-in{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:none}
+}
+
+.driver-hero{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  display:grid;
+  gap:16px;
+  margin-top:14px;
+  padding:22px;
+  border-radius:var(--tr-radius-lg);
+  color:#fff;
+  background:
+    radial-gradient(circle at 92% 12%,rgba(245,183,0,.23),transparent 13rem),
+    linear-gradient(145deg,#0b1425,#152844 72%,#1c3355);
+  box-shadow:0 24px 48px -34px rgba(8,17,31,.9);
+}
+.driver-hero:after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:-58px;
+  bottom:-82px;
+  width:190px;
+  height:190px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:50%;
+  box-shadow:0 0 0 34px rgba(255,255,255,.035),0 0 0 68px rgba(255,255,255,.025);
+}
+.role-eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  width:max-content;
+  color:inherit;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+}
+.status-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#4ade80;
+  box-shadow:0 0 0 4px rgba(74,222,128,.16);
+}
+.driver-hero h1{
+  max-width:14ch;
+  margin:8px 0 7px;
+  font-size:clamp(28px,8vw,38px);
+  line-height:1.03;
+  letter-spacing:-.045em;
+}
+.driver-hero p{
+  max-width:46ch;
+  margin:0;
+  color:#c8d4e4;
+  font-size:14px;
+  line-height:1.55;
+}
+.driver-hero-action{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  width:100%;
+  min-height:52px;
+  padding:0 16px;
+  border:0;
+  border-radius:14px;
+  color:var(--tr-navy-950);
+  background:var(--tr-yellow);
+  font-weight:700;
+  box-shadow:0 14px 24px -18px rgba(245,183,0,.9);
+  transition:background .18s var(--tr-ease),box-shadow .18s var(--tr-ease);
+}
+.driver-hero-action:hover{background:#ffc628;box-shadow:0 18px 28px -18px rgba(245,183,0,.95)}
+.driver-hero-action:active{background:#dda600}
+.driver-hero-metrics{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  border-top:1px solid rgba(255,255,255,.12);
+  padding-top:15px;
+}
+.driver-hero-metrics>div{
+  min-width:0;
+  padding:0 10px;
+  border-right:1px solid rgba(255,255,255,.10);
+}
+.driver-hero-metrics>div:first-child{padding-left:0}
+.driver-hero-metrics>div:last-child{padding-right:0;border-right:0}
+.driver-hero-metrics span{
+  display:block;
+  color:#9fb0c6;
+  font-size:10.5px;
+  font-weight:600;
+}
+.driver-hero-metrics strong{
+  display:block;
+  margin-top:3px;
+  color:#fff;
+  font-size:15px;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+body.app-driver .card{
+  margin-top:12px!important;
+  padding:17px!important;
+  border:1px solid var(--border)!important;
+  border-radius:18px!important;
+  background:var(--surface)!important;
+  box-shadow:var(--tr-shadow-sm)!important;
+}
+body.app-driver .card h2{
+  margin-bottom:13px!important;
+  color:var(--text)!important;
+  font-size:15px!important;
+  font-weight:700!important;
+  letter-spacing:-.01em!important;
+  text-transform:none!important;
+}
+body.app-driver .card h2 svg{
+  width:30px;
+  height:30px;
+  padding:7px;
+  border-radius:9px;
+  color:var(--tr-warning)!important;
+  background:var(--tr-yellow-soft);
+}
+body.app-driver label.fld{
+  margin-bottom:6px;
+  color:var(--text)!important;
+  font-size:13px;
+  font-weight:600;
+}
+body.app-driver input,
+body.app-driver select,
+body.app-driver textarea{
+  min-height:50px!important;
+  border:1px solid var(--border)!important;
+  border-radius:12px!important;
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+}
+body.app-driver input:focus,
+body.app-driver select:focus,
+body.app-driver textarea:focus{
+  border-color:#c58f00!important;
+  box-shadow:0 0 0 3px rgba(245,183,0,.22)!important;
+}
+body.app-driver .btn{
+  min-height:48px!important;
+  border-radius:12px!important;
+  font-weight:700!important;
+  transition:background .18s var(--tr-ease),border-color .18s var(--tr-ease),opacity .18s var(--tr-ease)!important;
+}
+body.app-driver .btn:active{transform:none!important;opacity:.86}
+body.app-driver .btn-accent{
+  color:var(--tr-navy-950)!important;
+  background:var(--tr-yellow)!important;
+  box-shadow:0 14px 24px -20px rgba(161,98,7,.9)!important;
+}
+body.app-driver .btn-primary{color:#fff!important;background:var(--tr-navy-900)!important}
+body.app-driver .btn-ghost{color:var(--text)!important;background:#edf1f6!important}
+body.app-driver .btn-big{min-height:56px!important}
+body.app-driver .chip{
+  min-height:46px;
+  border:1px solid var(--border)!important;
+  border-radius:12px!important;
+  color:var(--text)!important;
+  background:#f4f6f9!important;
+}
+body.app-driver .chip.on{
+  border-color:var(--tr-navy-900)!important;
+  color:#fff!important;
+  background:var(--tr-navy-900)!important;
+}
+body.app-driver .seg{
+  gap:4px;
+  padding:4px;
+  border:1px solid var(--border);
+  border-radius:13px!important;
+  background:#edf1f6!important;
+}
+body.app-driver .seg button{min-height:44px;border-radius:9px!important}
+body.app-driver .seg button.on{
+  color:var(--tr-navy-950)!important;
+  background:#fff!important;
+  box-shadow:0 3px 10px -7px rgba(15,23,42,.8)!important;
+}
+body.app-driver #cardCourses{
+  border-top:4px solid var(--tr-yellow)!important;
+}
+body.app-driver #amount{
+  min-height:56px!important;
+  font-size:19px!important;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+body.app-driver #addRide{min-width:118px;min-height:56px!important}
+body.app-driver .quicklink{
+  border:1px solid var(--border)!important;
+  border-radius:12px!important;
+  color:var(--tr-navy-900)!important;
+  background:#fff9df!important;
+}
+body.app-driver .item{
+  min-height:66px;
+  border:1px solid var(--border)!important;
+  border-radius:13px!important;
+  background:var(--surface2)!important;
+}
+body.app-driver .item .amt .net{font-variant-numeric:tabular-nums}
+body.app-driver .icon-btn{
+  width:48px!important;
+  height:48px!important;
+}
+body.app-driver .sumgrid{gap:10px!important}
+body.app-driver .stat{
+  min-height:82px;
+  padding:13px!important;
+  border:1px solid var(--border)!important;
+  border-radius:13px!important;
+  background:var(--surface2)!important;
+}
+body.app-driver .stat .k{color:var(--text2)!important}
+body.app-driver .stat .v{
+  color:var(--text)!important;
+  font-size:22px!important;
+  font-weight:700!important;
+  letter-spacing:-.03em;
+}
+body.app-driver .stat .v.acc{color:#8a5b00!important}
+body.app-driver .statebadge{
+  margin-left:auto;
+  border-radius:999px!important;
+  font-size:11px!important;
+}
+body.app-driver .statebadge.open{
+  color:#166534!important;
+  background:#dcfce7!important;
+}
+body.app-driver .statebadge.closed{
+  color:#475467!important;
+  background:#eef1f5!important;
+}
+
+body.app-driver nav.tabs{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:3px!important;
+  padding:7px 7px calc(7px + env(safe-area-inset-bottom))!important;
+  border-top:1px solid rgba(255,255,255,.08)!important;
+  background:rgba(8,17,31,.97)!important;
+  box-shadow:0 -18px 38px -30px #000!important;
+  backdrop-filter:blur(18px);
+  z-index:var(--tr-z-nav)!important;
+}
+body.app-driver nav.tabs button{
+  min-width:0;
+  max-width:none;
+  min-height:58px!important;
+  padding:6px 3px!important;
+  border-radius:12px!important;
+  color:#97a6ba!important;
+  font-size:11px!important;
+  transition:color .18s var(--tr-ease),background .18s var(--tr-ease)!important;
+}
+body.app-driver nav.tabs button svg{width:21px;height:21px}
+body.app-driver nav.tabs button.on{
+  color:var(--tr-yellow)!important;
+  background:rgba(245,183,0,.10)!important;
+}
+body.app-driver nav.tabs button:active{transform:none!important;background:rgba(255,255,255,.08)!important}
+
+body.app-driver .taxicard{
+  overflow:hidden;
+  padding:14px!important;
+  border:0!important;
+  color:#fff!important;
+  background:var(--tr-navy-950)!important;
+  box-shadow:0 26px 52px -34px #000!important;
+}
+body.app-driver .taxi-meter{
+  margin:0 0 14px!important;
+  padding:18px 17px 16px!important;
+  border:1px solid #29364b!important;
+  border-radius:18px!important;
+  background:
+    radial-gradient(circle at 50% -25%,rgba(245,183,0,.12),transparent 55%),
+    #050a12!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -18px 36px rgba(0,0,0,.22)!important;
+}
+body.app-driver .tm-brand{color:#d9e1ec!important}
+.tm-led-dot{
+  display:inline-block;
+  width:7px;
+  height:7px;
+  margin-right:7px;
+  border-radius:50%;
+  background:var(--tr-yellow);
+  box-shadow:0 0 0 4px rgba(245,183,0,.12);
+  vertical-align:middle;
+}
+body.app-driver .tm-tarif{
+  color:var(--tr-navy-950)!important;
+  background:var(--tr-yellow)!important;
+}
+body.app-driver .tm-price{
+  margin:8px 0 10px!important;
+  color:#ffc735!important;
+  font-size:clamp(58px,17vw,82px)!important;
+  text-shadow:0 0 24px rgba(245,183,0,.28)!important;
+}
+body.app-driver .tm-sub{border-color:#273246!important}
+body.app-driver .tm-cell{color:#95a3b7!important}
+body.app-driver .tm-cell b{color:#f2f5f9!important}
+body.app-driver .taxi-gps{color:#a9b6c8!important}
+body.app-driver .taxi-gps.live{color:#86efac!important}
+body.app-driver .taxi-gps.err{color:#fda4af!important}
+body.app-driver .taxi-legal{
+  border-color:#2a3649!important;
+  color:#a9b6c8!important;
+  background:#111b2a!important;
+}
+body.app-driver #taxiDone .note{
+  border-color:#334155!important;
+  color:#e2e8f0!important;
+  background:#111b2a!important;
+}
+body.app-driver #taxiDone label{color:#dbe4ef!important}
+body.app-driver #taxiDone .chip{
+  border-color:#334155!important;
+  color:#dbe4ef!important;
+  background:#162235!important;
+}
+body.app-driver #taxiDone .chip.on{
+  border-color:var(--tr-yellow)!important;
+  color:var(--tr-navy-950)!important;
+  background:var(--tr-yellow)!important;
+}
+body.app-driver .taxi-safety-note{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  color:#7a5211!important;
+  background:#fff9df!important;
+  border:1px solid #f0d780!important;
+}
+body.app-driver .taxi-safety-note svg{margin-top:1px}
+body.app-driver .hist{
+  min-height:76px;
+  border:1px solid var(--border)!important;
+  border-radius:16px!important;
+  box-shadow:var(--tr-shadow-sm)!important;
+}
+body.app-driver .hist .n .net{color:#8a5b00!important}
+body.app-driver .note{
+  border-style:solid!important;
+  border-color:var(--border)!important;
+  border-radius:12px!important;
+  background:var(--surface2)!important;
+}
+body.app-driver .fleet-note{
+  align-items:flex-start;
+  gap:8px;
+  color:#7a5211!important;
+  background:#fff9df!important;
+  border-color:#f0d780!important;
+}
+body.app-driver .fleet-note svg{margin-top:1px;flex:none}
+body.app-driver.fleet-managed .fleet-note{display:flex!important}
+body.app-driver #toast{
+  bottom:calc(94px + env(safe-area-inset-bottom))!important;
+  max-width:calc(100vw - 28px);
+  border-radius:12px!important;
+  color:#fff!important;
+  background:var(--tr-navy-900)!important;
+  white-space:normal!important;
+  text-align:center;
+  box-shadow:0 16px 40px -20px #000;
+}
+
+/* Écrans d'accueil et d'authentification chauffeur. Les !important sont
+   nécessaires car ces blocs historiques sont déclarés après cette feuille. */
+#welcomeScreen{
+  background:
+    radial-gradient(circle at 50% 0,rgba(245,183,0,.18),transparent 24rem),
+    var(--tr-navy-950)!important;
+  color:#fff!important;
+  font-family:var(--tr-font)!important;
+}
+#welcomeScreen .wc{max-width:400px!important}
+#welcomeScreen .m{
+  width:66px!important;
+  height:66px!important;
+  border-radius:18px!important;
+  color:var(--tr-navy-950)!important;
+  background:var(--tr-yellow)!important;
+  box-shadow:0 22px 34px -24px rgba(245,183,0,.9)!important;
+}
+#welcomeScreen h1{
+  max-width:12ch;
+  margin-inline:auto!important;
+  color:#fff!important;
+  font-family:var(--tr-font)!important;
+  font-size:36px!important;
+  font-weight:700!important;
+  letter-spacing:-.045em;
+}
+#welcomeScreen .sub{color:#aebcd0!important}
+#welcomeScreen .note{
+  color:#b8c4d4!important;
+  background:#111b2a!important;
+  border-color:#2b3749!important;
+}
+#welcomeScreen .wbtn{border-radius:13px!important;font-family:var(--tr-font)!important}
+#welcomeScreen .wbtn.primary{
+  border-color:var(--tr-yellow)!important;
+  color:var(--tr-navy-950)!important;
+  background:var(--tr-yellow)!important;
+}
+#welcomeScreen .wbtn.ghost{
+  border-color:#344256!important;
+  color:#fff!important;
+  background:rgba(255,255,255,.04)!important;
+}
+#authScreen{
+  --a-brand:var(--tr-yellow)!important;
+  --a-surface:#fff!important;
+  --a-muted:var(--tr-muted)!important;
+  --a-line:var(--tr-line)!important;
+  --a-danger:var(--tr-danger)!important;
+  --a-ink:var(--tr-text)!important;
+  background:rgba(8,17,31,.82)!important;
+  backdrop-filter:blur(14px)!important;
+  font-family:var(--tr-font)!important;
+}
+#authScreen .auth-card{
+  border:1px solid var(--tr-line)!important;
+  border-radius:22px!important;
+  box-shadow:0 28px 64px -30px #000!important;
+}
+#authScreen .auth-badge{color:var(--tr-navy-950)!important;background:var(--tr-yellow)!important}
+#authScreen .auth-btn{color:var(--tr-navy-950)!important;background:var(--tr-yellow)!important}
+#platePicker{background:rgba(8,17,31,.72)!important;backdrop-filter:blur(10px)}
+#platePicker .pp-wrap{border-radius:22px 22px 0 0!important}
+#platePicker .pp-item .tag,
+.platebar .pb-ico{color:var(--tr-navy-950)!important;background:var(--tr-yellow)!important}
+
+@media(min-width:720px){
+  body.app-driver>.wrap{padding-inline:18px!important}
+  body.app-driver #view-day.on{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+  body.app-driver #view-day>.driver-hero,
+  body.app-driver #view-day>#cardCourses,
+  body.app-driver #view-day>#cardCharges,
+  body.app-driver #view-day>#cardSummary{grid-column:1/-1}
+  body.app-driver #view-day>.card{margin-top:0!important}
+  body.app-driver #view-day>.driver-hero{margin-top:14px}
+  .driver-hero{
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+  }
+  .driver-hero-action{width:auto;min-width:190px}
+  .driver-hero-metrics{grid-column:1/-1}
+}
+@media(max-width:390px){
+  .driver-hero{padding:19px 17px}
+  .driver-hero-metrics>div{padding-inline:7px}
+  .driver-hero-metrics span{font-size:9.5px}
+  .driver-hero-metrics strong{font-size:13px}
+  body.app-driver .row2{grid-template-columns:1fr}
+  body.app-driver .amount-row,
+  body.app-driver .amount-row.ac2{grid-template-columns:1fr}
+  body.app-driver #addRide{width:100%}
+  body.app-driver .seg{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ==========================================================================
+   PATRON + SUPER ADMIN — fondations communes
+   ========================================================================== */
+
+body.app-manager,
+body.app-admin{
+  --bg:var(--tr-canvas)!important;
+  --surface:var(--tr-surface)!important;
+  --ink:var(--tr-text)!important;
+  --muted:var(--tr-muted)!important;
+  --line:var(--tr-line)!important;
+  --ok:var(--tr-success)!important;
+  --danger:var(--tr-danger)!important;
+  --radius:16px!important;
+  --shadow:var(--tr-shadow-md)!important;
+  --serif:var(--tr-font)!important;
+  --sans:var(--tr-font)!important;
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:var(--bg)!important;
+  color:var(--ink)!important;
+}
+body.app-manager{
+  --brand:#123b73!important;
+  --on-brand:#fff!important;
+  --gold:#0e7490!important;
+  --role-accent:#1d4ed8;
+  --role-soft:#eaf1ff;
+  --role-rail:#0b2448;
+}
+body.app-admin{
+  --brand:#312e81!important;
+  --on-brand:#fff!important;
+  --gold:#a16207!important;
+  --role-accent:#6d4aff;
+  --role-soft:#efecff;
+  --role-rail:#17143d;
+}
+body.app-manager .btn,
+body.app-admin .btn{
+  min-height:44px!important;
+  border-radius:10px!important;
+  font-weight:600!important;
+  transition:background .18s var(--tr-ease),border-color .18s var(--tr-ease),color .18s var(--tr-ease),box-shadow .18s var(--tr-ease)!important;
+}
+body.app-manager .btn.primary,
+body.app-admin .btn.primary{
+  border-color:var(--role-accent)!important;
+  color:#fff!important;
+  background:var(--role-accent)!important;
+  box-shadow:0 12px 22px -18px var(--role-accent)!important;
+}
+body.app-manager .btn:hover,
+body.app-admin .btn:hover{filter:none!important;border-color:#98a2b3!important}
+body.app-manager .btn.primary:hover,
+body.app-admin .btn.primary:hover{border-color:var(--role-accent)!important;filter:brightness(1.08)!important}
+body.app-manager .btn:active,
+body.app-admin .btn:active{opacity:.82}
+body.app-manager input,
+body.app-manager select,
+body.app-manager textarea,
+body.app-admin input,
+body.app-admin select,
+body.app-admin textarea{
+  min-height:46px!important;
+  border:1px solid var(--line)!important;
+  border-radius:10px!important;
+  background:var(--surface)!important;
+  color:var(--ink)!important;
+}
+body.app-manager input:focus,
+body.app-manager select:focus,
+body.app-manager textarea:focus,
+body.app-admin input:focus,
+body.app-admin select:focus,
+body.app-admin textarea:focus{
+  border-color:var(--role-accent)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--role-accent) 18%,transparent)!important;
+}
+body.app-manager label,
+body.app-admin label{
+  color:#475467!important;
+  font-weight:600!important;
+}
+body.app-manager .card,
+body.app-admin .card{
+  border:1px solid var(--line)!important;
+  border-radius:16px!important;
+  background:var(--surface)!important;
+  box-shadow:var(--tr-shadow-sm)!important;
+}
+body.app-manager .card h2,
+body.app-admin .card h2,
+body.app-manager .csec h3,
+body.app-admin .csec h3{
+  color:var(--ink)!important;
+  font-family:var(--tr-font)!important;
+  font-weight:700!important;
+  letter-spacing:-.025em;
+}
+body.app-manager .card .hint,
+body.app-admin .card .hint,
+body.app-manager .sub,
+body.app-admin .sub{color:var(--muted)!important}
+body.app-manager .err:not(:empty),
+body.app-admin .err:not(:empty){
+  padding:9px 11px;
+  border:1px solid #fecaca;
+  border-radius:10px;
+  color:#b42318!important;
+  background:#fff1f2;
+}
+
+/* Connexion : panneau éditorial + formulaire. */
+body.app-manager #login,
+body.app-admin #login{
+  display:grid!important;
+  grid-template-columns:minmax(360px,1fr) minmax(360px,480px);
+  align-items:stretch!important;
+  gap:0;
+  min-height:100dvh;
+  padding:0!important;
+  color:#fff;
+  background:var(--role-rail)!important;
+}
+body.app-manager #login.hidden,
+body.app-admin #login.hidden{display:none!important}
+.login-visual{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  min-height:100%;
+  padding:clamp(40px,7vw,96px);
+  background:
+    radial-gradient(circle at 20% 22%,color-mix(in srgb,var(--role-accent) 44%,transparent),transparent 24rem),
+    linear-gradient(145deg,var(--role-rail),#07111f);
+}
+.login-visual:after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:-12rem;
+  bottom:-17rem;
+  width:36rem;
+  height:36rem;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:50%;
+  box-shadow:0 0 0 5rem rgba(255,255,255,.025),0 0 0 10rem rgba(255,255,255,.018);
+}
+.login-role{
+  width:max-content;
+  margin-bottom:18px;
+  padding:6px 10px;
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:999px;
+  color:#dbe7f7;
+  background:rgba(255,255,255,.06);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.login-visual h2{
+  max-width:13ch;
+  margin:0;
+  color:#fff!important;
+  font-size:clamp(38px,5vw,66px);
+  line-height:1;
+  letter-spacing:-.055em;
+}
+.login-visual p{
+  max-width:53ch;
+  margin:22px 0 0;
+  color:#b8c6d9;
+  font-size:16px;
+}
+.login-feature-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:9px;
+  margin-top:30px;
+}
+.login-feature-list span{
+  padding:8px 11px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;
+  color:#dfe8f4;
+  background:rgba(255,255,255,.05);
+  font-size:12.5px;
+  font-weight:600;
+}
+body.app-manager .loginbox,
+body.app-admin .loginbox{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  width:100%!important;
+  max-width:none!important;
+  padding:clamp(28px,5vw,64px);
+  text-align:left!important;
+  color:var(--tr-text);
+  background:#f7f9fc;
+}
+body.app-manager .loginbox .m,
+body.app-admin .loginbox .m{
+  width:46px!important;
+  height:46px!important;
+  margin:0 0 24px!important;
+  border-radius:13px!important;
+  color:#fff!important;
+  background:var(--role-accent)!important;
+}
+body.app-manager .loginbox h1,
+body.app-admin .loginbox h1{
+  margin:0 0 4px!important;
+  color:var(--tr-text)!important;
+  font-family:var(--tr-font)!important;
+  font-size:32px!important;
+  font-weight:700!important;
+  letter-spacing:-.04em;
+}
+body.app-manager .loginbox>p,
+body.app-admin .loginbox>p{margin-bottom:22px!important;color:var(--tr-muted)!important}
+body.app-manager .loginbox .card,
+body.app-admin .loginbox .card{
+  padding:22px!important;
+  border-radius:18px!important;
+  box-shadow:0 24px 48px -38px rgba(15,23,42,.75)!important;
+}
+body.app-manager .loginbox .btn.primary,
+body.app-admin .loginbox .btn.primary{min-height:50px!important}
+.password-field{position:relative}
+.password-field input{padding-right:52px!important}
+.password-toggle{
+  position:absolute;
+  top:1px;
+  right:1px;
+  display:grid;
+  place-items:center;
+  width:46px;
+  height:44px;
+  border:0;
+  border-radius:9px;
+  color:var(--tr-muted);
+  background:transparent;
+}
+.password-toggle:hover{color:var(--role-accent);background:var(--role-soft)}
+.password-toggle[aria-pressed="true"]{color:var(--role-accent);background:var(--role-soft)}
+
+/* Héros de rôle. */
+body.app-manager .role-hero,
+body.app-admin .role-hero{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  display:grid;
+  gap:22px;
+  padding:26px!important;
+  border:0!important;
+  color:#fff;
+  background:
+    radial-gradient(circle at 86% 0,color-mix(in srgb,var(--role-accent) 40%,transparent),transparent 22rem),
+    linear-gradient(135deg,var(--role-rail),#0c1829 72%)!important;
+  box-shadow:0 26px 52px -38px var(--role-rail)!important;
+}
+body.app-manager .role-hero:after,
+body.app-admin .role-hero:after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:-72px;
+  top:-98px;
+  width:230px;
+  height:230px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:50%;
+  box-shadow:0 0 0 38px rgba(255,255,255,.025);
+}
+body.app-manager .role-hero h2,
+body.app-admin .role-hero h2{
+  max-width:18ch;
+  margin:9px 0 7px!important;
+  color:#fff!important;
+  font-size:clamp(24px,3vw,36px)!important;
+  line-height:1.08;
+}
+body.app-manager .role-hero p,
+body.app-admin .role-hero p{max-width:62ch;margin:0;color:#b9c8da;font-size:14px}
+.role-hero-actions{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.role-quick{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  min-width:0;
+  min-height:70px;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:13px;
+  color:#fff;
+  background:rgba(255,255,255,.06);
+  text-align:left;
+  transition:background .18s var(--tr-ease),border-color .18s var(--tr-ease)!important;
+}
+.role-quick:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.11)}
+.role-quick:active{background:rgba(255,255,255,.15)}
+.role-quick.primary{
+  border-color:color-mix(in srgb,var(--role-accent) 72%,white);
+  background:var(--role-accent);
+}
+.role-quick>svg{
+  width:34px;
+  height:34px;
+  padding:7px;
+  border-radius:10px;
+  background:rgba(255,255,255,.10);
+}
+.role-quick span{min-width:0}
+.role-quick strong,
+.role-quick small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role-quick strong{font-size:13px}
+.role-quick small{margin-top:2px;color:#b8c6d9;font-size:11px}
+.role-quick.primary small{color:rgba(255,255,255,.78)}
+
+/* Données, cartes et formulaire de règlement. */
+body.app-manager .fleet,
+body.app-admin .fleet{
+  border:1px solid var(--line)!important;
+  border-radius:14px!important;
+  background:var(--tr-surface-soft)!important;
+}
+body.app-manager .fleet .fh .nm,
+body.app-admin .fleet .fh .nm{
+  font-family:var(--tr-font)!important;
+  font-weight:700!important;
+}
+body.app-manager .opt,
+body.app-admin .opt{
+  min-height:46px;
+  border-color:var(--line)!important;
+  border-radius:10px!important;
+  background:#fff!important;
+}
+body.app-manager .pill.on,
+body.app-admin .pill.on{color:#166534!important;background:#dcfce7!important}
+body.app-manager .pill.off,
+body.app-admin .pill.off{color:#b42318!important;background:#fee2e2!important}
+body.app-manager .rolechip,
+body.app-admin .rolechip{
+  border-radius:999px!important;
+  color:#7a4e00!important;
+  background:#fff2bd!important;
+}
+body.app-manager .rolechip.superadmin,
+body.app-admin .rolechip.superadmin{
+  color:#4c1d95!important;
+  background:#ede9fe!important;
+}
+body.app-manager .rolechip.chauffeur,
+body.app-admin .rolechip.chauffeur{
+  color:#344054!important;
+  background:#eaecf0!important;
+}
+body.app-manager .kpis,
+body.app-admin .kpis,
+body.app-manager .cgrid,
+body.app-admin .cgrid{gap:10px!important}
+body.app-manager .kpi,
+body.app-admin .kpi,
+body.app-manager .cbox,
+body.app-admin .cbox{
+  min-height:86px;
+  border:1px solid var(--line)!important;
+  border-radius:13px!important;
+  background:var(--tr-surface-soft)!important;
+}
+body.app-manager .kpi .n,
+body.app-admin .kpi .n,
+body.app-manager .cbox .v,
+body.app-admin .cbox .v{
+  color:var(--ink)!important;
+  font-family:var(--tr-font)!important;
+  font-size:23px!important;
+  font-weight:700!important;
+  letter-spacing:-.035em;
+}
+body.app-manager #cSheet,
+body.app-admin #cSheet{margin-top:20px}
+body.app-manager #calcCard>h2,
+body.app-admin #calcCard>h2,
+body.app-manager #cSheet>.csec>h3,
+body.app-admin #cSheet>.csec>h3,
+body.app-admin #rideAdminSec .ride-admin-head>h3{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+body.app-manager #calcCard>h2:before,
+body.app-admin #calcCard>h2:before,
+body.app-manager #cSheet>.csec>h3:before,
+body.app-admin #cSheet>.csec>h3:before,
+body.app-admin #rideAdminSec .ride-admin-head>h3:before{
+  display:grid;
+  flex:none;
+  place-items:center;
+  width:28px;
+  height:28px;
+  border-radius:9px;
+  color:var(--role-accent);
+  background:var(--role-soft);
+  font-size:12px;
+  font-weight:700;
+}
+body.app-manager #calcCard>h2:before,
+body.app-admin #calcCard>h2:before{content:"1"}
+body.app-manager #cSheet>.csec:nth-child(1)>h3:before,
+body.app-admin #cSheet>.csec:nth-child(1)>h3:before{content:"2"}
+body.app-manager #cSheet>.csec:nth-child(2)>h3:before,
+body.app-admin #cSheet>.csec:nth-child(2)>h3:before{content:"3"}
+body.app-manager #cResult>h3:before,
+body.app-admin #cResult>h3:before{content:"4"}
+body.app-admin #cSheet>#rideAdminSec>h3:before,
+body.app-admin #cSheet>#rideAdminSec .ride-admin-head>h3:before{content:"3"}
+body.app-admin #cSheet>.csec:nth-child(3)>h3:before{content:"4"}
+body.app-admin #cResult>h3:before{content:"5"}
+body.app-manager .csec,
+body.app-admin .csec{
+  margin-top:14px!important;
+  padding:18px!important;
+  border:1px solid var(--line)!important;
+  border-radius:14px;
+  background:var(--tr-surface-soft);
+}
+body.app-manager #cResult,
+body.app-admin #cResult{
+  position:sticky;
+  z-index:10;
+  bottom:12px;
+  border-color:color-mix(in srgb,var(--role-accent) 40%,var(--line))!important;
+  background:var(--surface)!important;
+  box-shadow:0 20px 40px -28px rgba(15,23,42,.65)!important;
+}
+body.app-manager .settle,
+body.app-admin .settle{
+  border-color:#86c59b!important;
+  color:#14532d;
+  background:#ecfdf3!important;
+}
+body.app-manager .settle.owe,
+body.app-admin .settle.owe{
+  border-color:#e9c46a!important;
+  color:#713f12;
+  background:#fff8df!important;
+}
+body.app-manager .settle.pending,
+body.app-admin .settle.pending{
+  border-color:#aab7c4!important;
+  color:#344054;
+  background:#f8fafc!important;
+}
+body.app-manager .settle.pending .big,
+body.app-admin .settle.pending .big{font-size:18px!important}
+body.app-manager .holding-summary,
+body.app-admin .holding-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 18px;
+  margin:8px 0 4px;
+  font-size:13px;
+  line-height:1.45;
+}
+body.app-manager .holding-summary strong,
+body.app-admin .holding-summary strong{font-variant-numeric:tabular-nums}
+body.app-manager .settlement-holders input[aria-invalid="true"],
+body.app-admin .settlement-holders input[aria-invalid="true"]{
+  border-color:var(--danger)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 16%,transparent)!important;
+}
+body.app-manager table th,
+body.app-admin table th{
+  position:sticky;
+  z-index:1;
+  top:0;
+  color:#475467!important;
+  background:var(--surface)!important;
+}
+body.app-manager #platesList,
+body.app-manager #accountsList,
+body.app-manager #cDetail,
+body.app-admin #platesList,
+body.app-admin #accountsList,
+body.app-admin #cDetail{overflow-x:auto}
+
+body.app-admin .ride-admin-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+body.app-admin .ride-admin-head h3{margin:0!important}
+body.app-admin .ride-admin-list{margin-top:14px}
+body.app-admin .ride-table-scroll{overflow-x:auto}
+body.app-admin .ride-led{min-width:820px}
+body.app-admin .ride-led th:nth-child(3),
+body.app-admin .ride-led td:nth-child(3),
+body.app-admin .ride-led th:nth-child(4),
+body.app-admin .ride-led td:nth-child(4){text-align:left}
+body.app-admin .ride-led th:last-child,
+body.app-admin .ride-led td:last-child{text-align:right}
+body.app-admin .ride-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+  white-space:nowrap;
+}
+body.app-admin .btn.danger{color:var(--danger)!important}
+body.app-admin .btn.danger:hover{border-color:var(--danger)!important;background:#fff1f2!important}
+
+body.app-admin .ride-dialog{
+  width:min(620px,calc(100vw - 32px));
+  max-height:calc(100dvh - 32px);
+  padding:0;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  color:var(--ink);
+  background:var(--surface);
+  box-shadow:0 28px 80px -30px rgba(15,23,42,.7);
+}
+body.app-admin .ride-dialog::backdrop{background:rgba(15,23,42,.62);backdrop-filter:blur(2px)}
+body.app-admin .ride-dialog-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  padding:22px 22px 16px;
+  border-bottom:1px solid var(--line);
+}
+body.app-admin .ride-dialog-head h2{margin:5px 0 3px;font-size:22px;letter-spacing:0}
+body.app-admin .ride-dialog-head p{margin:0;color:var(--muted);font-size:13px}
+body.app-admin .ride-dialog-close{
+  display:grid;
+  flex:none;
+  place-items:center;
+  width:44px;
+  height:44px;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  color:var(--ink);
+  background:var(--surface);
+}
+body.app-admin .ride-dialog-body{padding:20px 22px}
+body.app-admin .ride-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  padding:16px 22px;
+  border-top:1px solid var(--line);
+  background:var(--tr-surface-soft);
+}
+
+/* Traceur GPS : liste de véhicules et carte constituent une seule console. */
+body.app-manager #mapCard,
+body.app-admin #mapCard{
+  overflow:hidden;
+  padding:0!important;
+}
+body.app-manager #mapCard>h2,
+body.app-admin #mapCard>h2{padding:22px 22px 0;margin-bottom:3px!important}
+body.app-manager #mapCard>.hint,
+body.app-admin #mapCard>.hint{padding:0 22px;margin-bottom:14px!important}
+body.app-manager #mapCard>.frow,
+body.app-admin #mapCard>.frow{padding:0 22px 16px;margin:0!important}
+.map-toolbar{align-items:flex-end!important;gap:10px!important}
+.map-filter{display:grid;gap:5px;min-width:190px}
+.map-filter.replay-filter{min-width:260px;flex:1}
+.map-filter label{margin:0!important;font-size:11px!important;text-transform:uppercase;letter-spacing:0!important}
+.map-filter select{width:100%;max-width:none!important}
+.map-toolbar #mapStatus{align-self:center;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tracker-list{
+  display:flex;
+  gap:9px;
+  overflow:auto;
+  padding:12px 1px 3px;
+  scrollbar-width:thin;
+}
+.tracker-car{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  align-items:center;
+  gap:2px 9px;
+  min-width:190px;
+  min-height:62px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  color:var(--ink);
+  background:var(--surface);
+  text-align:left;
+  transition:border-color .18s var(--tr-ease),background .18s var(--tr-ease);
+}
+.tracker-car:hover,.tracker-car:focus-visible{
+  border-color:var(--role-accent);
+  background:var(--role-soft);
+}
+.tracker-car .tracker-dot{
+  grid-row:1/3;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--ok);
+  box-shadow:0 0 0 4px rgba(21,128,61,.13);
+}
+.tracker-car.delayed .tracker-dot{
+  background:#d97706;
+  box-shadow:0 0 0 4px rgba(217,119,6,.13);
+}
+.tracker-car.offline:disabled{opacity:1!important;cursor:default!important;filter:none!important}
+.tracker-car.offline .tracker-dot{
+  background:#98a2b3;
+  box-shadow:0 0 0 4px rgba(152,162,179,.16);
+}
+.tracker-car strong{font-size:14px;font-weight:700}
+.tracker-car small{color:var(--muted);font-size:12px}
+.map-coords{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;font-variant-numeric:tabular-nums}
+body.app-manager #map,
+body.app-admin #map{
+  min-height:460px!important;
+  margin:0!important;
+  border:0!important;
+  border-top:1px solid var(--line)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.taxi-pin{
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  border:3px solid #fff;
+  border-radius:14px 14px 14px 4px;
+  color:#fff;
+  background:var(--role-accent);
+  box-shadow:0 10px 24px -9px rgba(0,0,0,.7);
+  transform:rotate(-45deg);
+}
+.taxi-pin svg{transform:rotate(45deg)}
+.taxi-pin.delayed{background:#d97706}
+.leaflet-marker-icon{transition:transform .8s linear}
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important}
+.leaflet-control-attribution{font-size:10px!important}
+
+/* App shell bureau. */
+@media(min-width:980px){
+  body.app-manager #app,
+  body.app-admin #app{min-height:100dvh}
+  body.app-manager #app header.top,
+  body.app-admin #app header.top{
+    position:fixed!important;
+    z-index:var(--tr-z-sticky)!important;
+    top:0;
+    right:0;
+    left:276px;
+    height:74px;
+    margin:0!important;
+    padding:13px 30px!important;
+    border-bottom:1px solid var(--line)!important;
+    background:rgba(255,255,255,.92)!important;
+    backdrop-filter:blur(16px);
+  }
+  body.app-manager #app header.top .brand,
+  body.app-admin #app header.top .brand{font-size:16px!important;font-weight:700!important}
+  body.app-manager #app header.top .brand .m,
+  body.app-admin #app header.top .brand .m{
+    color:#fff!important;
+    background:var(--role-accent)!important;
+  }
+  body.app-manager #app .tabs,
+  body.app-admin #app .tabs{
+    position:fixed!important;
+    z-index:var(--tr-z-nav)!important;
+    inset:0 auto 0 0!important;
+    display:flex!important;
+    flex-direction:column;
+    gap:6px!important;
+    width:276px;
+    padding:112px 14px 22px!important;
+    overflow:visible!important;
+    border:0!important;
+    background:var(--role-rail)!important;
+    box-shadow:18px 0 42px -34px #000;
+  }
+  body.app-manager #app .tabs:before,
+  body.app-admin #app .tabs:before{
+    position:absolute;
+    top:27px;
+    left:22px;
+    color:#fff;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:-.02em;
+  }
+  body.app-manager #app .tabs:before{content:"TAXI RECETTES · PATRON"}
+  body.app-admin #app .tabs:before{content:"TAXI RECETTES · ADMIN"}
+  body.app-manager #app .tabs:after,
+  body.app-admin #app .tabs:after{
+    content:"ESPACE DE TRAVAIL";
+    position:absolute;
+    top:67px;
+    left:22px;
+    color:#8391a7;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:.13em;
+  }
+  body.app-manager #app .tabs button,
+  body.app-admin #app .tabs button{
+    justify-content:flex-start!important;
+    width:100%;
+    min-height:50px!important;
+    padding:10px 13px!important;
+    border:1px solid transparent!important;
+    border-radius:11px!important;
+    color:#aebbd0!important;
+    background:transparent!important;
+    font-size:14px!important;
+  }
+  body.app-manager #app .tabs button:hover,
+  body.app-admin #app .tabs button:hover{
+    color:#fff!important;
+    background:rgba(255,255,255,.07)!important;
+  }
+  body.app-manager #app .tabs button.on,
+  body.app-admin #app .tabs button.on{
+    border-color:rgba(255,255,255,.12)!important;
+    color:#fff!important;
+    background:var(--role-accent)!important;
+    box-shadow:0 12px 24px -18px var(--role-accent)!important;
+  }
+  body.app-manager #app .tabs .ic,
+  body.app-admin #app .tabs .ic{
+    display:grid;
+    place-items:center;
+    width:29px;
+    height:29px;
+    border-radius:8px;
+    background:rgba(255,255,255,.07);
+  }
+  body.app-manager #app .tabs button.on .ic,
+  body.app-admin #app .tabs button.on .ic{background:rgba(255,255,255,.14)}
+  body.app-manager #app .wrap,
+  body.app-admin #app .wrap{
+    display:grid;
+    grid-template-columns:repeat(12,minmax(0,1fr));
+    gap:18px;
+    width:auto!important;
+    max-width:1600px!important;
+    margin:0 0 0 276px!important;
+    padding:106px 30px 70px!important;
+  }
+  body.app-manager #app .wrap>h1,
+  body.app-manager #app .wrap>.sub,
+  body.app-manager #app .wrap>.fleetbar,
+  body.app-manager #app .wrap>.card,
+  body.app-admin #app .wrap>h1,
+  body.app-admin #app .wrap>.sub,
+  body.app-admin #app .wrap>.fleetbar,
+  body.app-admin #app .wrap>.card{grid-column:1/-1}
+  body.app-manager #app h1.page,
+  body.app-admin #app h1.page{
+    margin:0!important;
+    color:var(--ink)!important;
+    font-family:var(--tr-font)!important;
+    font-size:34px!important;
+    font-weight:700!important;
+    letter-spacing:-.045em;
+  }
+  body.app-manager #app h1.page:before,
+  body.app-admin #app h1.page:before{
+    display:block;
+    margin-bottom:7px;
+    color:var(--role-accent);
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.13em;
+  }
+  body.app-manager #app h1.page:before{content:"GESTION DE FLOTTE"}
+  body.app-admin #app h1.page:before{content:"SUPERVISION DU RÉSEAU"}
+  body.app-manager #app .wrap>.sub,
+  body.app-admin #app .wrap>.sub{margin:-14px 0 4px!important;max-width:760px}
+  body.app-manager #app .wrap>.card,
+  body.app-admin #app .wrap>.card{margin:0!important;padding:22px!important}
+  .role-hero{
+    grid-template-columns:minmax(0,1fr) minmax(440px,.9fr);
+    align-items:center;
+  }
+  body.app-admin #overviewCard{grid-column:1/-1!important}
+  body.app-admin #createFleetCard{grid-column:span 5!important}
+  body.app-admin #fleetsCard{grid-column:span 7!important}
+  body.app-admin #accountsCard{grid-column:1/-1!important}
+  body.app-manager #calcCard,
+  body.app-admin #calcCard{max-width:none!important}
+  body.app-manager #cSheet,
+  body.app-admin #cSheet{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px;
+  }
+  body.app-manager #cSheet.hidden,
+  body.app-admin #cSheet.hidden{display:none!important}
+  body.app-manager #cResult,
+  body.app-admin #cResult{grid-column:1/-1}
+  body.app-manager #mapCard,
+  body.app-admin #mapCard{
+    display:grid;
+    grid-template-columns:310px minmax(0,1fr);
+  }
+  body.app-manager #mapCard.hidden,
+  body.app-admin #mapCard.hidden{display:none!important}
+  body.app-manager #mapCard>h2,
+  body.app-manager #mapCard>.hint,
+  body.app-manager #mapCard>.frow,
+  body.app-admin #mapCard>h2,
+  body.app-admin #mapCard>.hint,
+  body.app-admin #mapCard>.frow{grid-column:1/-1}
+  body.app-manager #mapCard>.tracker-list,
+  body.app-admin #mapCard>.tracker-list{
+    grid-column:1;
+    grid-row:4;
+    flex-direction:column;
+    max-height:calc(100dvh - 310px);
+    padding:14px;
+    border-top:1px solid var(--line);
+    background:#f8fafc;
+  }
+  body.app-manager #mapCard>.tracker-list .tracker-car,
+  body.app-admin #mapCard>.tracker-list .tracker-car{width:100%;min-width:0}
+  body.app-manager #mapCard>#map,
+  body.app-admin #mapCard>#map{
+    grid-column:2;
+    grid-row:4;
+    height:calc(100dvh - 310px)!important;
+    min-height:560px!important;
+    border-left:1px solid var(--line)!important;
+    border-top:1px solid var(--line)!important;
+  }
+}
+
+/* Navigation mobile des tableaux de bord. */
+@media(max-width:979px){
+  body.app-manager #app header.top,
+  body.app-admin #app header.top{
+    position:sticky!important;
+    z-index:var(--tr-z-sticky)!important;
+    top:0;
+    min-height:66px;
+    margin:0!important;
+    padding:calc(10px + env(safe-area-inset-top)) 14px 10px!important;
+    border-bottom:1px solid var(--line)!important;
+    background:rgba(255,255,255,.94)!important;
+    backdrop-filter:blur(14px);
+  }
+  body.app-manager #app header.top .brand,
+  body.app-admin #app header.top .brand{font-size:0!important}
+  body.app-manager #app header.top .brand .m,
+  body.app-admin #app header.top .brand .m{
+    width:40px!important;
+    height:40px!important;
+    color:#fff!important;
+    background:var(--role-accent)!important;
+  }
+  body.app-manager #app .tabs,
+  body.app-admin #app .tabs{
+    position:fixed!important;
+    z-index:var(--tr-z-nav)!important;
+    inset:auto 0 0 0!important;
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:2px!important;
+    padding:7px 6px calc(7px + env(safe-area-inset-bottom))!important;
+    overflow:visible!important;
+    border-top:1px solid var(--line)!important;
+    border-bottom:0!important;
+    background:rgba(255,255,255,.96)!important;
+    box-shadow:0 -16px 36px -30px rgba(15,23,42,.7);
+    backdrop-filter:blur(18px);
+  }
+  body.app-manager #app .tabs button,
+  body.app-admin #app .tabs button{
+    display:flex!important;
+    flex-direction:column;
+    justify-content:center!important;
+    gap:2px!important;
+    min-width:0!important;
+    min-height:57px!important;
+    padding:5px 2px!important;
+    border:0!important;
+    border-radius:11px!important;
+    color:#667085!important;
+    background:transparent!important;
+    font-size:10.5px!important;
+  }
+  body.app-manager #app .tabs button.on,
+  body.app-admin #app .tabs button.on{
+    color:var(--role-accent)!important;
+    background:var(--role-soft)!important;
+  }
+  body.app-manager #app .tabs .ic,
+  body.app-admin #app .tabs .ic{height:23px}
+  body.app-manager #app .wrap,
+  body.app-admin #app .wrap{
+    width:100%!important;
+    max-width:840px!important;
+    margin:0 auto!important;
+    padding:22px 14px calc(98px + env(safe-area-inset-bottom))!important;
+  }
+  body.app-manager #app h1.page,
+  body.app-admin #app h1.page{
+    margin:0!important;
+    color:var(--ink)!important;
+    font-family:var(--tr-font)!important;
+    font-size:28px!important;
+    font-weight:700!important;
+    letter-spacing:-.04em;
+  }
+  body.app-manager #app .sub,
+  body.app-admin #app .sub{margin-bottom:18px!important}
+  body.app-manager #app .wrap>.card,
+  body.app-admin #app .wrap>.card{padding:18px!important}
+  .role-hero{padding:20px!important}
+  .role-hero-actions{grid-template-columns:1fr}
+  .role-quick{min-height:60px}
+  body.app-manager #map,
+  body.app-admin #map{height:56dvh!important;min-height:380px!important}
+}
+@media(max-width:760px){
+  body.app-manager #login,
+  body.app-admin #login{display:flex!important;flex-direction:column}
+  .login-visual{min-height:auto;padding:calc(36px + env(safe-area-inset-top)) 22px 26px}
+  .login-visual h2{max-width:15ch;font-size:34px}
+  .login-visual p{margin-top:14px;font-size:14px}
+  .login-feature-list{display:none}
+  body.app-manager .loginbox,
+  body.app-admin .loginbox{flex:1;padding:28px 18px 36px}
+  body.app-manager .row.c2,
+  body.app-manager .row.c3,
+  body.app-admin .row.c2,
+  body.app-admin .row.c3{grid-template-columns:1fr}
+  .map-toolbar{align-items:stretch!important}
+  .map-filter,.map-filter.replay-filter{min-width:100%;width:100%}
+  .map-toolbar .btn{flex:1}
+  .map-toolbar #mapStatus{width:100%;margin-left:0;white-space:normal}
+  body.app-admin .ride-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+  body.app-admin .ride-dialog-head{padding:18px 16px 14px}
+  body.app-admin .ride-dialog-body{padding:18px 16px}
+  body.app-admin .ride-dialog-actions{padding:14px 16px;flex-direction:column-reverse}
+  body.app-admin .ride-dialog-actions .btn{width:100%}
+}
+@media(max-width:430px){
+  body.app-manager #app header.top .btn.ghost,
+  body.app-admin #app header.top .btn.ghost{
+    width:44px;
+    padding:0!important;
+    overflow:hidden;
+    color:transparent!important;
+  }
+  body.app-manager #app header.top .btn.ghost:after,
+  body.app-admin #app header.top .btn.ghost:after{
+    content:"";
+    width:19px;
+    height:19px;
+    background:currentColor;
+    color:var(--muted);
+    clip-path:polygon(11% 15%,48% 15%,48% 28%,24% 28%,24% 72%,48% 72%,48% 85%,11% 85%,11% 15%,56% 50%,77% 29%,86% 38%,73% 50%,86% 62%,77% 71%);
+  }
+  .who{max-width:42%;overflow:hidden}
+  .who b,.who .r{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
+/* ==========================================================================
+   THÈME SOMBRE
+   ========================================================================== */
+
+@media(prefers-color-scheme:dark){
+  :root{color-scheme:dark}
+  body.app-driver{
+    --bg:#07101d!important;
+    --surface:#101b2b!important;
+    --surface2:#152235!important;
+    --text:#f2f5f9!important;
+    --text2:#a6b3c5!important;
+    --border:#2a384c!important;
+    --chip-bg:#172438!important;
+    background:#07101d!important;
+  }
+  body.app-driver .card,
+  body.app-driver .hist{box-shadow:none!important}
+  body.app-driver .chip,
+  body.app-driver .quicklink{background:#162338!important}
+  body.app-driver .quicklink{color:#f4d56b!important}
+  body.app-driver .btn-ghost{background:#1a293e!important}
+  body.app-driver .seg{border-color:#314158!important;background:#1a293e!important}
+  body.app-driver .seg button{color:#b7c3d2!important}
+  body.app-driver .seg button.on{color:#fff!important;background:#2a3a50!important}
+  body.app-driver .stat .v.acc,
+  body.app-driver .hist .n .net{color:#f4cf58!important}
+  body.app-driver .taxi-safety-note{
+    color:#f4d56b!important;
+    border-color:#5e501c!important;
+    background:#211e0f!important;
+  }
+  body.app-driver .fleet-note{
+    color:#f4d56b!important;
+    border-color:#5e501c!important;
+    background:#211e0f!important;
+  }
+  body.app-manager,
+  body.app-admin{
+    --bg:#09111f!important;
+    --surface:#111c2c!important;
+    --ink:#f2f5f9!important;
+    --muted:#9eacbf!important;
+    --line:#2b394d!important;
+    background:#09111f!important;
+  }
+  body.app-manager label,
+  body.app-admin label{color:#c2ccda!important}
+  body.app-manager .fleet,
+  body.app-admin .fleet,
+  body.app-manager .kpi,
+  body.app-admin .kpi,
+  body.app-manager .cbox,
+  body.app-admin .cbox,
+  body.app-manager .csec,
+  body.app-admin .csec,
+  body.app-manager .opt,
+  body.app-admin .opt{background:#152235!important}
+  body.app-manager #app header.top,
+  body.app-admin #app header.top,
+  body.app-manager #app .tabs,
+  body.app-admin #app .tabs{border-color:var(--line)!important}
+  body.app-manager #app header.top,
+  body.app-admin #app header.top{background:rgba(17,28,44,.94)!important}
+  body.app-manager #app .tabs,
+  body.app-admin #app .tabs{background:var(--role-rail)!important}
+  body.app-manager #app .tabs button,
+  body.app-admin #app .tabs button{color:#aebbd0!important}
+  body.app-manager #app .tabs button.on,
+  body.app-admin #app .tabs button.on{color:#fff!important;background:var(--role-accent)!important}
+  body.app-manager table th,
+  body.app-admin table th{background:var(--surface)!important;color:#c2ccda!important}
+  body.app-manager #mapCard>.tracker-list,
+  body.app-admin #mapCard>.tracker-list{background:#0d1726}
+  .tracker-car{background:var(--surface)}
+  body.app-manager .settle,
+  body.app-admin .settle{color:#bbf7d0;background:#11351f!important}
+  body.app-manager .settle.owe,
+  body.app-admin .settle.owe{color:#fde68a;background:#372c0c!important}
+  body.app-manager .settle.pending,
+  body.app-admin .settle.pending{color:#e5e7eb;background:#1f2937!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}

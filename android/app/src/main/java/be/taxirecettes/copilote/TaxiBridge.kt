@@ -21,6 +21,12 @@ import java.io.File
  */
 class TaxiBridge(private val ctx: Context) {
 
+    init {
+        // Une trace restée en file après une fin de course hors-ligne repart dès
+        // la prochaine ouverture de l'app, même si le taximètre ne tourne plus.
+        try { PositionPush.restore(ctx) } catch (_: Exception) {}
+    }
+
     @JavascriptInterface
     fun isNative(): Boolean = true
 
@@ -100,6 +106,7 @@ class TaxiBridge(private val ctx: Context) {
             return "{\"ok\":false,\"err\":\"gps\"}"
         }
         Meter.start(tariffs)
+        Meter.snapshot(ctx) // immédiat : la course survit même à un kill avant le premier point GPS
         return try {
             val i = Intent(ctx, TaximeterService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -108,6 +115,8 @@ class TaxiBridge(private val ctx: Context) {
                 ctx.startService(i)
             "{\"ok\":true}"
         } catch (_: Exception) {
+            try { Meter.stop() } catch (_: Exception) {}
+            try { Meter.clearSnapshot(ctx) } catch (_: Exception) {}
             "{\"ok\":false,\"err\":\"service\"}"
         }
     }
@@ -118,10 +127,13 @@ class TaxiBridge(private val ctx: Context) {
     /* Partage de position pendant une course : la page fournit les identifiants
        (URL, clé publique, jeton, ids) UNIQUEMENT si consentement + plaque prise. */
     @JavascriptInterface
-    fun setPositionAuth(json: String) { try { PositionPush.configure(json) } catch (_: Exception) {} }
+    fun setPositionAuth(json: String) { try { PositionPush.configure(ctx, json) } catch (_: Exception) {} }
 
     @JavascriptInterface
-    fun clearPositionAuth() { PositionPush.clear() }
+    fun clearPositionAuth() { PositionPush.clear(ctx) }
+
+    @JavascriptInterface
+    fun stopPositionPush() { PositionPush.stop(ctx) }
 
     @JavascriptInterface
     fun stopMeter(): String {

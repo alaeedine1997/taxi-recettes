@@ -3,12 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Taxi Patron">
+<meta name="theme-color" content="#123B73">
 <title>Taxi Recettes — Tableau de bord</title>
+<link rel="manifest" href="manifest-patron.json">
+<link rel="apple-touch-icon" href="icons/taxi-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin=""></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJ4rXfyxRpKX/vzXt+YnrgvvkE9r9=" crossorigin></script>
 <style>
   :root{
     --bg:#FAF5EC; --surface:#FFFFFF; --ink:#241C12; --muted:#7C6F5B;
@@ -138,11 +145,23 @@
     padding:11px 18px;border-radius:11px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:100;max-width:90vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
+<link rel="stylesheet" href="ui-system.css?v=3">
 </head>
-<body>
+<body class="app-manager">
+<a class="skip-link" href="#mainContent">Aller au contenu</a>
 
 <!-- ============ CONNEXION ============ -->
 <section id="login">
+  <div class="login-visual" aria-hidden="true">
+    <span class="login-role">Espace patron</span>
+    <h2>Pilotez votre flotte avec une vue claire.</h2>
+    <p>Recettes, chauffeurs, plaques et positions GPS réunis dans un seul centre opérationnel.</p>
+    <div class="login-feature-list">
+      <span>Suivi GPS en direct</span>
+      <span>Règlements vérifiables</span>
+      <span>Gestion des chauffeurs</span>
+    </div>
+  </div>
   <div class="loginbox">
     <div class="m"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
     <h1 id="loginTitle">Tableau de bord</h1>
@@ -151,9 +170,14 @@
       <label for="lgUser">Identifiant</label>
       <input type="text" id="lgUser" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ex : alae" style="margin-bottom:12px">
       <label for="lgPass">Mot de passe</label>
-      <input type="password" id="lgPass" autocomplete="current-password" placeholder="••••••••">
+      <div class="password-field">
+        <input type="password" id="lgPass" autocomplete="current-password" placeholder="••••••••">
+        <button type="button" class="password-toggle" data-password-target="lgPass" aria-label="Afficher le mot de passe" aria-pressed="false">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <button type="submit" class="btn primary" id="lgSubmit" style="width:100%;margin-top:16px">Se connecter</button>
-      <div class="err" id="lgErr"></div>
+      <div class="err" id="lgErr" role="alert" aria-live="polite"></div>
     </form>
   </div>
 </section>
@@ -164,21 +188,43 @@
     <div class="brand"><span class="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>Taxi Recettes</div>
     <div class="sp"></div>
     <div class="who"><b id="whoName">—</b><div class="r" id="whoRole">—</div></div>
-    <button class="btn sm ghost" id="logoutBtn">Déconnexion</button>
+    <button type="button" class="btn sm ghost" id="logoutBtn">Déconnexion</button>
   </header>
 
   <!-- Menu : une section à la fois, pour ne plus tout empiler sur un écran -->
   <nav class="tabs" id="tabs">
-    <button data-sec="resume"   class="on"><span class="ic">🏠</span>Résumé</button>
-    <button data-sec="recettes"><span class="ic">💶</span>Recettes</button>
-    <button data-sec="plaques"><span class="ic">🚕</span>Plaques</button>
-    <button data-sec="carte"><span class="ic">🗺️</span>Carte</button>
-    <button data-sec="reglages"><span class="ic">⚙️</span>Réglages</button>
+    <button type="button" data-sec="resume" class="on"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg></span>Résumé</button>
+    <button type="button" class="hidden" data-sec="recettes" data-feature="recettes"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg></span>Recettes</button>
+    <button type="button" data-sec="plaques"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>Plaques</button>
+    <button type="button" class="hidden" data-sec="carte" data-feature="carte"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg></span>Carte</button>
+    <button type="button" data-sec="reglages"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg></span>Réglages</button>
   </nav>
 
-  <div class="wrap">
-    <h1 class="page" id="pageTitle">Flottes</h1>
+  <main class="wrap" id="mainContent" tabindex="-1">
+    <h1 class="page" id="pageTitle" tabindex="-1">Flottes</h1>
     <p class="sub" id="pageSub">Crée et pilote tes flottes : débloque les options, fixe le nombre de plaques, suspends en un clic.</p>
+
+    <div class="card role-hero manager-hero" id="managerHero" data-sec="resume">
+      <div class="role-hero-copy">
+        <span class="role-eyebrow"><span class="status-dot" aria-hidden="true"></span>Centre opérationnel</span>
+        <h2>Les actions importantes sont à portée de main.</h2>
+        <p>Suivez les véhicules, préparez un règlement ou gérez les plaques sans parcourir tout le tableau de bord.</p>
+      </div>
+      <div class="role-hero-actions">
+        <button type="button" class="role-quick primary hidden" data-jump-sec="carte" data-feature="carte">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg>
+          <span><strong>Traceur GPS</strong><small>Voir les chauffeurs</small></span>
+        </button>
+        <button type="button" class="role-quick hidden" data-jump-sec="recettes" data-feature="recettes">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.5-1.6-.8-2.6-.8-2 0-3.4 1.5-3.4 4.3s1.4 4.3 3.4 4.3c1 0 1.9-.3 2.6-.8M7.5 11h5M7.5 13h5"/></svg>
+          <span><strong>Règlement</strong><small>Calculer une période</small></span>
+        </button>
+        <button type="button" class="role-quick" data-jump-sec="plaques">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg>
+          <span><strong>Plaques</strong><small>Gérer les véhicules</small></span>
+        </button>
+      </div>
+    </div>
 
     <!-- section sans contenu disponible (ex. carte GPS non débloquée) -->
     <div class="card hidden" id="secEmpty">
@@ -192,7 +238,7 @@
       <div class="row c3">
         <div><label for="nfName">Nom de la flotte</label><input type="text" id="nfName" placeholder="ex : Taxis Étoile"></div>
         <div><label for="nfMax">Plaques max</label><input type="number" id="nfMax" min="0" value="5"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="nfAdd" style="width:100%">Créer</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="nfAdd" style="width:100%">Créer</button></div>
       </div>
       <div class="err" id="nfErr"></div>
     </div>
@@ -211,7 +257,7 @@
       <div class="row c3" id="newPlateRow">
         <div><label for="npLabel">Nouvelle plaque</label><input type="text" id="npLabel" placeholder="ex : TX-AA-101" autocapitalize="characters"></div>
         <div id="npFleetWrap" class="hidden"><label for="npFleet">Flotte</label><select id="npFleet"></select></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="npAdd" style="width:100%">Ajouter</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="npAdd" style="width:100%">Ajouter</button></div>
       </div>
       <div class="err" id="npErr"></div>
       <div id="platesList" style="margin-top:12px"><div class="empty">Chargement…</div></div>
@@ -219,8 +265,8 @@
 
     <!-- Calcul de recette sur une période -->
     <div class="card" id="calcCard" data-sec="recettes">
-      <h2>Calcul de recette</h2>
-      <p class="hint">Choisis un chauffeur et une période (une semaine, un mois, deux mois…). La recette est construite à partir de ce qu'il a noté dans son carnet.</p>
+      <h2>Préparer un règlement</h2>
+      <p class="hint">Choisis le chauffeur et la période. La fiche se charge automatiquement, puis tu ajustes uniquement les éléments nécessaires.</p>
       <div class="row c2">
         <div><label for="cChauf">Chauffeur</label><select id="cChauf"><option value="">— chargement —</option></select></div>
         <div><label for="cPreset">Période</label><select id="cPreset">
@@ -235,7 +281,7 @@
         <div><label for="cFrom">Du</label><input type="date" id="cFrom"></div>
         <div><label for="cTo">Au</label><input type="date" id="cTo"></div>
       </div>
-      <button class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Charger la fiche</button>
+      <button type="button" class="btn primary" id="cLoad" style="width:100%;margin-top:12px">Calculer cette période</button>
       <div class="err" id="cErr"></div>
 
       <div id="cSheet" class="hidden">
@@ -244,7 +290,7 @@
           <h3>Fiche du chauffeur <span class="muted" id="cSheetWho"></span></h3>
           <div class="cgrid" id="cSheetKpis"></div>
           <p class="chelp" id="cKmNote"></p>
-          <button class="btn sm ghost" id="cDetailBtn" style="margin-top:10px">Voir le détail par jour ▾</button>
+          <button type="button" class="btn sm ghost" id="cDetailBtn" style="margin-top:10px">Voir le détail par jour ▾</button>
           <div id="cDetail" class="hidden" style="margin-top:10px;overflow-x:auto"></div>
         </div>
 
@@ -270,12 +316,16 @@
               <p class="chelp">Le patron a payé pour le chauffeur → le chauffeur lui rembourse.</p></div>
             <div><label for="cChC">Charge en faveur du chauffeur (€)</label><input type="text" inputmode="decimal" id="cChC" value="0">
               <p class="chelp">Le chauffeur a payé pour le patron → le patron lui rembourse.</p>
-              <button class="btn sm ghost hidden" id="cChCFill">Reporter ses charges notées</button></div>
+              <button type="button" class="btn sm ghost hidden" id="cChCFill">Reporter ses charges notées</button></div>
           </div>
-          <div style="margin-top:10px"><label for="cKeepCash">Le chauffeur garde le cash ?</label><select id="cKeepCash">
-            <option value="1" selected>Oui — il garde le cash encaissé</option>
-            <option value="0">Non — il remet tout le cash au patron</option>
-          </select></div>
+          <div class="row c2 settlement-holders" style="margin-top:10px">
+            <div><label for="cSumup">SumUp encaissé sur le compte patron (€)</label>
+              <input type="text" inputmode="decimal" id="cSumup" placeholder="0,00" autocomplete="off" required aria-describedby="cPaymentHelp cPaymentErr"></div>
+            <div><label for="cTaxiCheque">Chèques taxi à rembourser au patron (€)</label>
+              <input type="text" inputmode="decimal" id="cTaxiCheque" placeholder="0,00" autocomplete="off" required aria-describedby="cPaymentHelp cPaymentErr"></div>
+          </div>
+          <p class="chelp" id="cPaymentHelp">Le reste des encaissements à bord est le cash conservé par le chauffeur. Indique 0,00 € quand un montant est nul.</p>
+          <div class="err" id="cPaymentErr" role="alert" aria-live="polite"></div>
         </div>
 
         <!-- résultat -->
@@ -290,28 +340,29 @@
       <select id="cfgFleet" class="hidden" style="margin-bottom:12px"></select>
       <div id="cfgSources"></div>
       <div class="row c3" style="margin-top:10px">
-        <div><label for="cfgNewName">Nouvelle source</label><input id="cfgNewName" placeholder="ex : Aéroport"></div>
+        <div><label for="cfgNewName">Nouvelle source</label><input type="text" id="cfgNewName" placeholder="ex : Aéroport"></div>
         <div><label for="cfgNewRate">Retenue %</label><input id="cfgNewRate" type="number" min="0" max="100" value="0"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn" id="cfgAddSrc" style="width:100%">+ Ajouter</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn" id="cfgAddSrc" style="width:100%">+ Ajouter</button></div>
       </div>
       <label class="opt" style="margin-top:8px"><input type="checkbox" id="cfgNewAppCash"> Style Uber / Bolt (« sur l'app + cash », sans commission)</label>
       <div class="row c2" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
         <div><label for="cfgFuel">Carburant € / km</label><input id="cfgFuel" type="number" min="0" step="0.01" value="0"></div>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" id="cfgSave" style="width:100%">Enregistrer les réglages</button></div>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn primary" id="cfgSave" style="width:100%">Enregistrer les réglages</button></div>
       </div>
       <div class="err" id="cfgErr"></div>
     </div>
 
     <!-- Carte GPS en direct -->
     <div class="card hidden" id="mapCard" data-sec="carte" data-allowed="0">
-      <h2>Carte en direct</h2>
-      <p class="hint">Position des plaques en service (le chauffeur a pris sa plaque et partagé sa position).</p>
+      <h2 id="mapTitle">Carte en direct</h2>
+      <p class="hint" id="mapHint">Position mesurée du chauffeur, heure du dernier point et rayon de précision GPS. Le cercle autour du taxi représente l'incertitude réelle.</p>
       <div class="frow">
         <select id="mapFleet" class="hidden"></select>
         <select id="mapReplay"><option value="">— Trajet du jour : choisir une plaque —</option></select>
-        <button class="btn sm" id="mapLiveBtn">↻ Rafraîchir</button>
+        <button type="button" class="btn sm" id="mapLiveBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5"/><path d="M20 4v7h-7"/></svg>Rafraîchir</button>
         <span class="muted" id="mapStatus"></span>
       </div>
+      <section class="tracker-list" id="trackerList" aria-label="Véhicules suivis"></section>
       <div id="map"></div>
     </div>
 
@@ -321,27 +372,27 @@
       <p class="hint">Les chauffeurs et patrons rattachés.</p>
       <div id="accountsList"><div class="empty">Chargement…</div></div>
       <div style="margin-top:14px">
-        <button class="btn" id="newUserToggle">+ Nouveau compte</button>
+        <button type="button" class="btn" id="newUserToggle">+ Nouveau compte</button>
         <div id="newUserForm" class="hidden" style="margin-top:12px;border-top:1px solid var(--line);padding-top:14px">
           <div class="row c2">
-            <div><label for="nuUser">Identifiant</label><input id="nuUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : jean"></div>
-            <div><label for="nuName">Nom affiché</label><input id="nuName" placeholder="ex : Jean D."></div>
+            <div><label for="nuUser">Identifiant</label><input type="text" id="nuUser" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex : jean"></div>
+            <div><label for="nuName">Nom affiché</label><input type="text" id="nuName" placeholder="ex : Jean D."></div>
           </div>
           <div class="row c2" style="margin-top:10px">
-            <div><label for="nuPass">Mot de passe</label><input id="nuPass" type="text" placeholder="min. 6 caractères"></div>
+            <div><label for="nuPass">Mot de passe</label><input id="nuPass" type="password" autocomplete="new-password" placeholder="min. 10 caractères"></div>
             <div id="nuRoleWrap" class="hidden"><label for="nuRole">Rôle</label><select id="nuRole"><option value="chauffeur">Chauffeur</option><option value="patron">Patron</option></select></div>
           </div>
           <div id="nuFleetWrap" class="hidden" style="margin-top:10px"><label for="nuFleet">Flotte</label><select id="nuFleet"></select></div>
-          <button class="btn primary" id="nuCreate" style="margin-top:12px">Créer le compte</button>
+          <button type="button" class="btn primary" id="nuCreate" style="margin-top:12px">Créer le compte</button>
           <div class="err" id="nuErr"></div>
           <p class="hint" style="margin:10px 0 0">L'identifiant de connexion sera <code id="nuPreview">jean</code>. Communique le mot de passe au chauffeur.</p>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const SB_URL='https://trftmfsuucgauglchnfw.supabase.co';
@@ -370,7 +421,7 @@ async function api(path, opts){
   const h=Object.assign({'apikey':SB_KEY,'Content-Type':'application/json'}, opts.headers||{});
   if(session && !opts.anon){ await ensureFresh(); if(session && session.access_token) h['Authorization']='Bearer '+session.access_token; }
   try{
-    const r=await fetch(SB_URL+path,{method:opts.method||'GET',headers:h,body:opts.body});
+    const r=await fetch(SB_URL+path,{method:opts.method||'GET',headers:h,body:opts.body,cache:opts.cache||'default'});
     let data=null; try{ data=await r.json(); }catch(_){ }
     return {ok:r.ok, status:r.status, data};
   }catch(_){ return {ok:false, status:0, netError:true}; }
@@ -407,24 +458,53 @@ async function login(user, pass){
   }
   return {ok:true};
 }
-function resetCalc(){ _sheet=null; _reqSeq++; try{ $('cSheet').classList.add('hidden'); $('cResult').innerHTML=''; $('cSheetKpis').innerHTML=''; $('cErr').textContent=''; }catch(_){ } }
-function logout(){ stopPoll(); resetCalc(); clearSession(); showLogin(); }
+function resetCalc(){
+  _sheet=null; _reqSeq++;
+  try{
+    $('cSheet').classList.add('hidden'); $('cResult').innerHTML=''; $('cSheetKpis').innerHTML=''; $('cErr').textContent='';
+    $('cSumup').value=''; $('cTaxiCheque').value=''; $('cPaymentErr').textContent='';
+    $('cSumup').removeAttribute('aria-invalid'); $('cTaxiCheque').removeAttribute('aria-invalid');
+  }catch(_){ }
+}
+function logout(){ stopFeatureRefresh(); stopPoll(); resetCalc(); clearSession(); showLogin(); }
 
 /* ---- vues ---- */
-function showLogin(){ $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+function showLogin(){ stopFeatureRefresh(); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
 /* ---- menu : une seule section affichée à la fois ----
    Une carte est visible si (sa section est active) ET (elle est autorisée pour ce
    rôle / cette flotte). Les deux conditions sont séparées pour ne pas se marcher
    dessus : setAllowed() dit "cette carte a le droit d'exister", showSection() dit
    "on regarde cette section-là". */
+function fleetFeatures(f){
+  const active=!!(f && !f.suspended);
+  const gpsLive=!!(active && f.opt_gps_live);
+  const replay=!!(active && f.opt_replay);
+  return {recettes:!!(active && f.opt_recettes), gpsLive, replay, carte:gpsLive||replay};
+}
+function patronSectionAllowed(section, access){
+  if(section==='recettes') return !!access.recettes;
+  if(section==='carte') return !!access.carte;
+  return true;
+}
+let _patronFeatures=fleetFeatures(null);
 let _sec='resume';
 function setAllowed(id, ok){ const el=$(id); if(el){ el.dataset.allowed = ok?'1':'0'; applySection(); } }
+function setFeatureVisible(feature, visible){
+  document.querySelectorAll('[data-feature="'+feature+'"]').forEach(el=>{
+    el.classList.toggle('hidden', !visible);
+    if('disabled' in el) el.disabled=!visible;
+  });
+}
 function applySection(){
   document.querySelectorAll('.card[data-sec]').forEach(el=>{
     const visible = (el.dataset.sec===_sec) && (el.dataset.allowed!=='0');
     el.classList.toggle('hidden', !visible);
   });
-  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.sec===_sec));
+  document.querySelectorAll('#tabs button').forEach(b=>{
+    const active=b.dataset.sec===_sec;
+    b.classList.toggle('on',active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
   const vide = !document.querySelector('.card[data-sec="'+_sec+'"]:not(.hidden)');
   $('secEmpty').classList.toggle('hidden', !vide);
 }
@@ -436,15 +516,29 @@ const SEC_TXT = {
   reglages: ['Réglages', 'Sources et retenues, coût carburant, et tes chauffeurs.']
 };
 function showSection(k){
+  if(!patronSectionAllowed(k,_patronFeatures)) k='resume';
   _sec=k; applySection();
   const t=SEC_TXT[k]; if(t){ $('pageTitle').textContent=t[0]; $('pageSub').textContent=t[1]; }
+  try{ $('pageTitle').focus({preventScroll:true}); }catch(_){ }
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(_){ window.scrollTo(0,0); }
   if(k==='carte'){
     if(_map){ setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);   /* Leaflet a besoin d'être visible pour se dimensionner */
-              loadLive(); if(!_pollTimer) _pollTimer=setInterval(loadLive, 8000); }
+              if(_patronFeatures.gpsLive){ loadLive(); if(!_pollTimer) _pollTimer=setInterval(loadLive, 8000); } }
   } else stopPoll();   /* on quitte la carte : on arrête le rafraîchissement */
 }
 $('tabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-sec]'); if(b) showSection(b.dataset.sec); });
+document.addEventListener('click', e=>{
+  const b=e.target.closest('[data-jump-sec]');
+  if(b) showSection(b.dataset.jumpSec);
+  const toggle=e.target.closest('[data-password-target]');
+  if(toggle){
+    const input=$(toggle.dataset.passwordTarget);
+    const show=input.type==='password';
+    input.type=show?'text':'password';
+    toggle.setAttribute('aria-pressed',show?'true':'false');
+    toggle.setAttribute('aria-label',show?'Masquer le mot de passe':'Afficher le mot de passe');
+  }
+});
 
 function showApp(){
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
@@ -457,7 +551,7 @@ function showApp(){
   $('fleetsHint').textContent = isAdmin
     ? 'Coche les options débloquées pour chaque flotte. Les changements se sauvent automatiquement.'
     : 'Options débloquées par l\'administrateur (lecture seule).';
-  loadFleets(); loadAccounts();
+  loadFleets(); loadAccounts(); startFeatureRefresh();
   if(!isAdmin) loadPlates();
   applyPreset();   /* période par défaut = ce mois-ci */
   showSection('resume');
@@ -465,16 +559,59 @@ function showApp(){
 
 /* ---- flottes ---- */
 const OPTS=[['opt_gps_live','Carte GPS en direct'],['opt_replay','Trajet du jour'],['opt_recettes','Recettes & historique']];
+function sameFeatures(a,b){
+  return a.recettes===b.recettes && a.gpsLive===b.gpsLive && a.replay===b.replay;
+}
+function applyPatronFeatureAccess(f, notify){
+  const previous=_patronFeatures, next=fleetFeatures(f);
+  _patronFeatures=next;
+  setAllowed('calcCard',next.recettes);
+  setAllowed('mapCard',next.carte);
+  setFeatureVisible('recettes',next.recettes);
+  setFeatureVisible('carte',next.carte);
+  $('mapReplay').classList.toggle('hidden',!next.replay);
+  $('mapLiveBtn').classList.toggle('hidden',!next.gpsLive);
+  $('trackerList').classList.toggle('hidden',!next.gpsLive);
+  $('mapTitle').textContent=next.gpsLive?(next.replay?'Carte en direct et trajet du jour':'Carte en direct'):'Trajet du jour';
+  $('mapHint').textContent=next.gpsLive
+    ? 'Position mesurée du chauffeur, heure du dernier point et rayon de précision GPS.'
+    : 'Choisis une plaque pour consulter uniquement son trajet du jour.';
+  if(previous.recettes && !next.recettes) resetCalc();
+  if(!next.gpsLive){
+    _liveReqSeq++; stopPoll();
+    if(_liveLayer) _liveLayer.clearLayers();
+    _trackers={}; $('trackerList').innerHTML='';
+  }
+  if(!next.replay){
+    $('mapReplay').value='';
+    if(_replayLayer) _replayLayer.clearLayers();
+  }
+  if(!patronSectionAllowed(_sec,next)) showSection('resume'); else applySection();
+  if(notify && !sameFeatures(previous,next)) toast('Options mises à jour par l’administrateur');
+  return next;
+}
+function syncPatronFleetRow(f){
+  if(!f) return;
+  OPTS.forEach(([key])=>{
+    const input=document.querySelector('[data-f="'+f.id+'"] [data-opt="'+key+'"]');
+    if(input) input.checked=!!f[key];
+  });
+  const pill=document.querySelector('[data-f="'+f.id+'"] .pill');
+  if(pill){
+    pill.classList.toggle('off',!!f.suspended); pill.classList.toggle('on',!f.suspended);
+    pill.textContent=f.suspended?'Suspendue':'Active';
+  }
+}
 async function loadFleets(){
   const isAdmin = session.profile.role==='superadmin';
   const r=await api('/rest/v1/fleets?select=*&order=created_at.desc');
   const el=$('fleetsList');
   if(!r.ok){ el.innerHTML='<div class="empty">Impossible de charger les flottes.</div>'; return; }
   const fleets=r.data||[];
-  _fleetsCache=fleets; fillNpFleet(); setupMapCard(); setupNewUser(); setupCfgCard();   /* plaque + carte GPS + comptes + réglages flotte */
-  /* Recettes = option débloquée par l'administrateur (opt_recettes) */
+  _fleetsCache=fleets;
   const myF=fleets.find(f=>f.id===session.profile.fleet_id)||null;
-  setAllowed('calcCard', !!(myF && !myF.suspended && myF.opt_recettes));
+  applyPatronFeatureAccess(myF,false);
+  fillNpFleet(); setupMapCard(); setupNewUser(); setupCfgCard();   /* plaque + carte GPS + comptes + réglages flotte */
   if(!fleets.length){ el.innerHTML='<div class="empty">Aucune flotte pour le moment.</div>'; return; }
   const dis = isAdmin ? '' : ' disabled';
   el.innerHTML=fleets.map(f=>{
@@ -486,11 +623,38 @@ async function loadFleets(){
       '<span class="pill '+(f.suspended?'off':'on')+'">'+(f.suspended?'Suspendue':'Active')+'</span></div>'+
       '<div class="opts">'+opts+'</div>'+
       (isAdmin
-        ? '<div class="frow"><button class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button><span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'
+        ? '<div class="frow"><button type="button" class="btn sm" data-suspend="'+f.id+'" data-val="'+(f.suspended?'0':'1')+'">'+(f.suspended?'Réactiver':'Suspendre')+'</button><span class="err" data-ferr="'+f.id+'" style="margin:0"></span></div>'
         : '<div class="frow"><span class="note" style="border:none;padding:0;background:none">Lecture seule — les options sont réglées par l\'administrateur.</span></div>')+
     '</div>';
   }).join('');
 }
+let _featureRefreshTimer=null, _featureReqSeq=0;
+async function refreshPatronFeatures(){
+  if(IS_ADMIN_APP || !session || !session.profile || !session.profile.fleet_id || document.hidden) return;
+  const mine=++_featureReqSeq, fid=session.profile.fleet_id;
+  const r=await api('/rest/v1/fleets?select=id,suspended,opt_gps_live,opt_replay,opt_recettes&id=eq.'+encodeURIComponent(fid),{cache:'no-store'});
+  if(mine!==_featureReqSeq || !r.ok || !session) return;
+  const fresh=Array.isArray(r.data)&&r.data.length?r.data[0]:null;
+  const index=_fleetsCache.findIndex(f=>f.id===fid);
+  if(fresh){
+    if(index>=0) Object.assign(_fleetsCache[index],fresh); else _fleetsCache.push(fresh);
+    syncPatronFleetRow(fresh);
+  } else if(index>=0) _fleetsCache.splice(index,1);
+  const previous=_patronFeatures;
+  applyPatronFeatureAccess(fresh,true);
+  if(!sameFeatures(previous,_patronFeatures)) setupMapCard();
+}
+function startFeatureRefresh(){
+  stopFeatureRefresh();
+  _featureRefreshTimer=setInterval(refreshPatronFeatures,15000);
+}
+function stopFeatureRefresh(){
+  if(_featureRefreshTimer){ clearInterval(_featureRefreshTimer); _featureRefreshTimer=null; }
+  _featureReqSeq++;
+}
+window.addEventListener('focus',refreshPatronFeatures);
+window.addEventListener('pageshow',refreshPatronFeatures);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refreshPatronFeatures(); });
 async function patchFleet(id, patch, errId){
   const r=await api('/rest/v1/fleets?id=eq.'+id,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(patch)});
   if(!r.ok){ const e=document.querySelector('[data-ferr="'+id+'"]'); if(e) e.textContent='Échec de l\'enregistrement.'; return false; }
@@ -559,8 +723,8 @@ async function loadPlates(){
         (isAdmin?'<td class="muted">'+esc((p.fleets&&p.fleets.name)||'')+'</td>':'')+
         '<td>'+driver+'</td>'+
         '<td style="text-align:right;white-space:nowrap">'+
-          (s?'<button class="btn sm ghost" data-release="'+s.id+'" data-lbl="'+esc(p.label)+'">Libérer</button> ':'')+
-          '<button class="btn sm ghost" data-plate-act="'+(p.active?'off':'on')+'" data-id="'+p.id+'">'+(p.active?'Désactiver':'Réactiver')+'</button>'+
+          (s?'<button type="button" class="btn sm ghost" data-release="'+s.id+'" data-lbl="'+esc(p.label)+'">Libérer</button> ':'')+
+          '<button type="button" class="btn sm ghost" data-plate-act="'+(p.active?'off':'on')+'" data-id="'+p.id+'">'+(p.active?'Désactiver':'Réactiver')+'</button>'+
         '</td>'+
       '</tr>';
     }).join('')+'</tbody></table>';
@@ -612,7 +776,11 @@ $('platesList').addEventListener('click', async e=>{
 });
 
 /* ---- carte GPS (Étape 3) ---- */
-let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null;
+let _map=null,_liveLayer=null,_replayLayer=null,_pollTimer=null,_liveReqSeq=0,_trackers={};
+function trackerIcon(delayed){
+  return L.divIcon({className:'',iconSize:[42,42],iconAnchor:[13,36],popupAnchor:[8,-34],html:
+    '<span class="taxi-pin'+(delayed?' delayed':'')+'"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15h16l-2-6H6l-2 6Z"/><path d="M5 15v3m14-3v3M8 18h8"/></svg></span>'});
+}
 function ensureMap(){
   if(_map) return _map;
   if(typeof L==='undefined'){ return null; }
@@ -626,32 +794,70 @@ function currentMapFleet(){
 }
 function stopPoll(){ if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; } }
 async function loadLive(){
+  if(!_patronFeatures.gpsLive) return;
   const fid=currentMapFleet(); if(!fid || !_map) return;
-  const since=new Date(Date.now()-10*60000).toISOString();
-  const r=await api('/rest/v1/positions?select=plate_id,lat,lng,accuracy,recorded_at,plates(label),profiles(username,display_name)&fleet_id=eq.'+fid+'&recorded_at=gte.'+since+'&order=recorded_at.desc&limit=1000');
+  const my=++_liveReqSeq;
+  const r=await api('/rest/v1/rpc/positions_live',{
+    method:'POST',
+    body:JSON.stringify({p_fleet:fid,p_points:40})
+  });
+  if(my!==_liveReqSeq || fid!==currentMapFleet() || !_patronFeatures.gpsLive) return;
   if(!r.ok){ $('mapStatus').textContent = r.status===404?'(schéma GPS pas encore installé)':'erreur de chargement'; return; }
-  const latest={}; (r.data||[]).forEach(p=>{ if(p.plate_id && !latest[p.plate_id]) latest[p.plate_id]=p; });
-  _liveLayer.clearLayers(); const pts=[];
+  const rows=Array.isArray(r.data)?r.data:[], latest={}, pending={};
+  rows.forEach(p=>{
+    if(!p||!p.plate_id) return;
+    const lat=Number(p.lat), lng=Number(p.lng), measured=Date.parse(p.recorded_at);
+    if(Number.isFinite(lat)&&Number.isFinite(lng)&&Number.isFinite(measured)){
+      if(!latest[p.plate_id]) latest[p.plate_id]=Object.assign({},p,{lat,lng,_measured:measured});
+    }else if(!pending[p.plate_id]) pending[p.plate_id]=p;
+  });
+  const seen=new Set(), pts=[], cards=[];
   Object.keys(latest).forEach(k=>{ const p=latest[k];
-    const nm=(p.plates&&p.plates.label)||'?', drv=(p.profiles&&(p.profiles.display_name||p.profiles.username))||'';
-    const acc=Number(p.accuracy)||0, age=Math.round((Date.now()-Date.parse(p.recorded_at))/60000);
-    /* cercle de précision : montre à quel point la position est fiable */
-    if(acc>0) _liveLayer.addLayer(L.circle([p.lat,p.lng],{radius:acc,color:'#3B82F6',weight:1,fillColor:'#3B82F6',fillOpacity:.10}));
-    _liveLayer.addLayer(L.marker([p.lat,p.lng]).bindPopup('<b>'+esc(nm)+'</b><br>'+esc(drv)+
-      '<br><span style="color:#888">maj '+fmtHM(p.recorded_at)+(age>=2?' ('+age+' min)':'')+
-      (acc>0?' · ±'+Math.round(acc)+' m':'')+'</span>'));
+    const nm=p.plate_label||'?', drv=p.driver_name||'';
+    const acc=Number(p.accuracy)||0, ageSec=Math.max(0,Math.round((Date.now()-p._measured)/1000));
+    const delayed=ageSec>=60, popup='<b>'+esc(nm)+'</b><br>'+esc(drv)+
+      '<br><span style="color:#557070">'+(delayed?'Dernière position · il y a '+Math.round(ageSec/60)+' min':'Direct · il y a '+ageSec+' s')+
+      (acc>0?' · précision ±'+Math.round(acc)+' m':'')+'</span>';
+    seen.add(k);
+    if(!_trackers[k]){
+      const trailPts=rows.filter(x=>x.plate_id===k&&Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))).slice().reverse().map(x=>[Number(x.lat),Number(x.lng)]);
+      const trail=L.polyline(trailPts,{color:'#0F766E',weight:4,opacity:.7,lineCap:'round'}).addTo(_liveLayer);
+      const marker=L.marker([p.lat,p.lng],{icon:trackerIcon(delayed)}).bindPopup(popup).addTo(_liveLayer);
+      const circle=L.circle([p.lat,p.lng],{radius:Math.max(1,acc),color:'#0F766E',weight:1,fillColor:'#14B8A6',fillOpacity:.12}).addTo(_liveLayer);
+      _trackers[k]={marker,circle,trail,delayed};
+    }else{
+      _trackers[k].trail.setLatLngs(rows.filter(x=>x.plate_id===k&&Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))).slice().reverse().map(x=>[Number(x.lat),Number(x.lng)]));
+      _trackers[k].marker.setLatLng([p.lat,p.lng]).setPopupContent(popup);
+      if(_trackers[k].delayed!==delayed){ _trackers[k].marker.setIcon(trackerIcon(delayed)); _trackers[k].delayed=delayed; }
+      _trackers[k].circle.setLatLng([p.lat,p.lng]).setRadius(Math.max(1,acc));
+    }
+    cards.push('<button type="button" class="tracker-car'+(delayed?' delayed':'')+'" data-track="'+esc(k)+'"><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv||'Chauffeur')+' · '+(delayed?Math.round(ageSec/60)+' min':ageSec+' s')+'</small></button>');
     pts.push([p.lat,p.lng]);
   });
-  $('mapStatus').textContent = pts.length ? (pts.length+' plaque'+(pts.length>1?'s':'')+' en service') : 'Aucune plaque en service';
+  Object.keys(pending).forEach(k=>{
+    if(latest[k]) return;
+    const p=pending[k], nm=p.plate_label||'?', drv=p.driver_name||'Chauffeur';
+    seen.add(k);
+    cards.push('<button type="button" class="tracker-car offline" disabled><span class="tracker-dot"></span><strong>'+esc(nm)+'</strong><small>'+esc(drv)+' · GPS en attente</small></button>');
+  });
+  Object.keys(_trackers).forEach(k=>{ if(!seen.has(k)){ _liveLayer.removeLayer(_trackers[k].marker); _liveLayer.removeLayer(_trackers[k].circle); _liveLayer.removeLayer(_trackers[k].trail); delete _trackers[k]; } });
+  $('trackerList').innerHTML=cards.join('');
+  const activeCount=Object.keys(latest).length+Object.keys(pending).filter(k=>!latest[k]).length;
+  $('mapStatus').textContent = activeCount
+    ? ('Actualisé · '+pts.length+'/'+activeCount+' chauffeur'+(activeCount>1?'s':'')+' localisé'+(pts.length>1?'s':''))
+    : 'Aucun chauffeur actif';
   /* un seul taxi -> on zoome près (rue) ; plusieurs -> on cadre l'ensemble */
   if(pts.length && !_replayLayer.getLayers().length){ try{ _map.fitBounds(pts,{padding:[50,50],maxZoom:pts.length===1?17:15}); }catch(_){ } }
 }
+$('trackerList').addEventListener('click',e=>{ const b=e.target.closest('[data-track]'); if(!b||!_trackers[b.dataset.track]) return; const m=_trackers[b.dataset.track].marker; _map.flyTo(m.getLatLng(),17,{duration:.65}); m.openPopup(); });
 async function loadReplay(plateId){
+  if(!_patronFeatures.replay) return;
   if(!_replayLayer) return;
   _replayLayer.clearLayers();
   if(!plateId) return;
   const start=new Date(); start.setHours(0,0,0,0);
   const r=await api('/rest/v1/positions?select=lat,lng&plate_id=eq.'+plateId+'&recorded_at=gte.'+start.toISOString()+'&order=recorded_at.asc&limit=3000');
+  if(!_patronFeatures.replay) return;
   if(!r.ok){ toast('Trajet indisponible'); return; }
   const pts=(r.data||[]).map(p=>[p.lat,p.lng]);
   if(!pts.length){ toast('Aucun trajet aujourd\'hui pour cette plaque'); return; }
@@ -662,31 +868,32 @@ async function loadReplay(plateId){
 }
 async function fillReplayPlates(){
   const fid=currentMapFleet(), sel=$('mapReplay');
+  if(!_patronFeatures.replay){ sel.innerHTML='<option value="">—</option>'; return; }
   if(!fid){ sel.innerHTML='<option value="">—</option>'; return; }
   const r=await api('/rest/v1/plates?select=id,label&fleet_id=eq.'+fid+'&order=label.asc');
   sel.innerHTML='<option value="">— Trajet du jour : choisir une plaque —</option>'+
     ((r.ok&&r.data)?r.data:[]).map(p=>'<option value="'+p.id+'">'+esc(p.label)+'</option>').join('');
 }
 function setupMapCard(){
-  const myFleet=_fleetsCache.find(f=>f.id===session.profile.fleet_id)||null;
-  const show = !IS_ADMIN_APP && myFleet && !myFleet.suspended && (myFleet.opt_gps_live||myFleet.opt_replay);
+  const show=!IS_ADMIN_APP && _patronFeatures.carte;
   setAllowed('mapCard', show);
   stopPoll();
   if(!show) return;
   if(!ensureMap()){ $('mapStatus').textContent='Carte indisponible (Leaflet non chargé).'; return; }
   $('mapFleet').classList.add('hidden');
   setTimeout(()=>{ try{ _map.invalidateSize(); }catch(_){ } }, 120);
-  fillReplayPlates();
+  if(_patronFeatures.replay) fillReplayPlates();
   /* le rafraîchissement (une requête toutes les 8 s) ne tourne QUE sur l'onglet
      Carte : sinon il partait sur tous les onglets, en permanence (batterie). */
-  if(_sec==='carte'){ loadLive(); _pollTimer=setInterval(loadLive, 8000); }
+  if(_sec==='carte' && _patronFeatures.gpsLive){ loadLive(); _pollTimer=setInterval(loadLive, 8000); }
+  else if(_patronFeatures.replay) $('mapStatus').textContent='Choisis une plaque pour afficher son trajet.';
 }
 $('mapReplay').addEventListener('change', e=>loadReplay(e.target.value));
 $('mapFleet').addEventListener('change', ()=>{ fillReplayPlates(); $('mapReplay').value=''; if(_replayLayer) _replayLayer.clearLayers(); loadLive(); });
 $('mapLiveBtn').addEventListener('click', loadLive);
 
 /* ---- réglages de flotte : sources + carburant (Étape 4) ---- */
-let _cfgSrc=[];
+let _cfgSrc=[], _cfgReqSeq=0;
 const DEF_SRC=[
   {id:'uber',name:'Uber',rate:0,builtin:true,appCash:true},
   {id:'bolt',name:'Bolt',rate:0,builtin:true,appCash:true},
@@ -698,18 +905,21 @@ function currentCfgFleet(){ return session.profile.role==='superadmin' ? ($('cfg
 function renderCfgSources(){
   $('cfgSources').innerHTML = _cfgSrc.length ? _cfgSrc.map((s,i)=>
     '<div class="frow" style="gap:8px;margin-top:8px">'+
-      '<input data-cfgname="'+i+'" value="'+esc(s.name)+'" style="flex:1">'+
+      '<input type="text" data-cfgname="'+i+'" value="'+esc(s.name)+'" style="flex:1">'+
       (s.appCash
         ? '<span class="muted" style="min-width:90px;text-align:center;font-size:13px">app + cash</span>'
         : '<input data-cfgrate="'+i+'" type="number" min="0" max="100" value="'+Number(s.rate)+'" style="width:76px"><span class="muted">%</span>')+
-      '<button class="btn sm ghost" data-cfgdel="'+i+'" aria-label="Supprimer">✕</button>'+
+      '<button type="button" class="btn sm ghost" data-cfgdel="'+i+'" aria-label="Supprimer">✕</button>'+
     '</div>'
   ).join('') : '<div class="empty">Aucune source.</div>';
 }
 async function loadCfg(){
   const fid=currentCfgFleet();
-  if(!fid){ _cfgSrc=[]; renderCfgSources(); return; }
+  const my=++_cfgReqSeq;
+  if(!fid){ _cfgSrc=[]; renderCfgSources(); $('cfgSave').disabled=true; return; }
+  $('cfgSave').disabled=true;
   const r=await api('/rest/v1/fleet_config?select=sources,fuel_per_km&fleet_id=eq.'+fid);
+  if(my!==_cfgReqSeq || fid!==currentCfgFleet()) return;
   if(r.ok && Array.isArray(r.data) && r.data.length && Array.isArray(r.data[0].sources) && r.data[0].sources.length){
     _cfgSrc = r.data[0].sources.map(s=>({id:String(s.id),name:String(s.name),rate:Number(s.rate)||0,builtin:!!s.builtin,appCash:!!s.appCash}));
     $('cfgFuel').value = Number(r.data[0].fuel_per_km)||0;
@@ -764,7 +974,7 @@ $('cfgSave').addEventListener('click', async ()=>{
   else $('cfgErr').textContent = r.status===404?'Table fleet_config absente — lance le SQL Étape 4.':(r.status===401||r.status===403?'Non autorisé.':'Échec de l\'enregistrement.');
 });
 
-/* ---- création de comptes (Étape 4, via Edge Function create-user) ---- */
+/* ---- création de comptes (via Edge Function rapid-function) ---- */
 function setupNewUser(){
   const isAdmin=session.profile.role==='superadmin';
   $('nuRoleWrap').classList.toggle('hidden', !isAdmin);
@@ -782,7 +992,7 @@ $('nuCreate').addEventListener('click', async ()=>{
   const fleet_id=isAdmin?$('nuFleet').value:session.profile.fleet_id;
   $('nuErr').textContent='';
   if(!/^[a-z0-9._-]{2,32}$/.test(username)){ $('nuErr').textContent='Identifiant : 2 à 32 caractères (a-z, 0-9, . _ -).'; return; }
-  if((password||'').length<6){ $('nuErr').textContent='Mot de passe : 6 caractères minimum.'; return; }
+  if((password||'').length<10){ $('nuErr').textContent='Mot de passe : 10 caractères minimum.'; return; }
   if(!fleet_id){ $('nuErr').textContent=isAdmin?'Choisis une flotte.':'Ton compte n\'est rattaché à aucune flotte.'; return; }
   const b=$('nuCreate'); b.disabled=true; b.textContent='Création…';
   let r={ok:false,status:0}, d=null;
@@ -798,9 +1008,9 @@ $('nuCreate').addEventListener('click', async ()=>{
     $('newUserForm').classList.add('hidden'); loadAccounts();
   } else {
     const e=d&&d.error;
-    const map={identifiant_pris:'Cet identifiant est déjà pris.',username_invalide:'Identifiant invalide.',mdp_court:'Mot de passe trop court.',role:'Rôle invalide.',patron_role:'Un patron ne peut créer que des chauffeurs.',patron_sans_flotte:'Ta flotte n\'est pas définie.',forbidden:'Non autorisé.'};
+    const map={identifiant_pris:'Cet identifiant est déjà pris.',username_invalide:'Identifiant invalide.',mdp_court:'Mot de passe trop court.',role:'Rôle invalide.',patron_role:'Un patron ne peut créer que des chauffeurs.',patron_sans_flotte:'Ta flotte n\'est pas définie.',flotte_suspendue:'Cette flotte est suspendue.',forbidden:'Non autorisé.'};
     $('nuErr').textContent = (r.status===404||r.status===0)
-      ? 'La fonction de création n\'est pas encore déployée sur le serveur (voir site/supabase/DEPLOY.md).'
+      ? 'La fonction « rapid-function » n\'est pas encore déployée sur le serveur (voir supabase/DEPLOY.md).'
       : (map[e]||('Erreur : '+(e||r.status)));
   }
 });
@@ -812,6 +1022,19 @@ let _sheet=null;
 const eur = n => (Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
 /* accepte la virgule décimale belge : « 0,25 » comme « 0.25 » */
 const num = id => { const v=Number(String($(id).value).replace(/[\s€]/g,'').replace(',','.')); return isFinite(v)&&v>0 ? v : 0; };
+function cMoneyInput(id){
+  let t=String($(id).value).replace(/[\s\u00a0\u202f\u20ac]/g,'');
+  if(t==='') return null;
+  if(t.includes(',')){
+    if(t.indexOf(',')!==t.lastIndexOf(',')) return NaN;
+    t=t.replace(/\./g,'').replace(',','.');
+  } else if(/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) {
+    t=t.replace(/\./g,'');
+  }
+  if(!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return NaN;
+  const v=Number(t);
+  return isFinite(v)&&v>=0 ? Math.round(v*100)/100 : NaN;
+}
 /* Pourcentages : même parsing. On garde la DERNIÈRE valeur valide si le champ est
    vidé — sinon un champ vide donnait 0 %, donc 100 % pour l'autre, sans prévenir. */
 const _lastPct={};
@@ -837,11 +1060,30 @@ function cRideNet(db,r){
   /* centimes entiers : même formule que l'app chauffeur, au centime près */
   return Math.round(Math.round(r.amt*100) * (10000 - Math.round(rate*100)) / 10000)/100;
 }
-/* part encaissée en liquide (même convention que le carnet) */
-function cRideCash(db,r){
-  /* borné à [0, montant] : un cash négatif réduisait ce que le chauffeur doit */
-  if(r.pay==='appcash') return Math.min(r.amt, Math.max(0, Math.round((Number(r.cash)||0)*100)/100));
-  return r.pay==='cash' ? cRideNet(db,r) : 0;
+/* Encaissements bruts à bord. Les libellés cash, SumUp et chèque taxi forment
+   le même ensemble ; leur détenteur réel est attribué au moment du règlement. */
+function cRideOnboard(r){
+  const amount=Math.max(0,Math.round((Number(r.amt)||0)*100)/100);
+  if(r.pay==='appcash') return Math.min(amount,Math.max(0,Math.round((Number(r.cash)||0)*100)/100));
+  return r.pay==='cash'||r.pay==='sumup'||r.pay==='cheque' ? amount : 0;
+}
+function cSettlement(onboard,sumup,cheque,chauffeurDue){
+  const cents=v=>Math.round((Number(v)||0)*100);
+  const onboardCents=Math.max(0,cents(onboard));
+  const sumupCents=Math.max(0,cents(sumup));
+  const chequeCents=Math.max(0,cents(cheque));
+  const patronHeldCents=sumupCents+chequeCents;
+  const chauffeurCashCents=onboardCents-patronHeldCents;
+  const valid=chauffeurCashCents>=0;
+  return {
+    valid,
+    onboard:onboardCents/100,
+    sumup:sumupCents/100,
+    cheque:chequeCents/100,
+    patronHeld:patronHeldCents/100,
+    chauffeurCash:chauffeurCashCents/100,
+    balance:valid ? (chauffeurCashCents-cents(chauffeurDue))/100 : null
+  };
 }
 
 /* --- périodes --- */
@@ -862,7 +1104,10 @@ $('cPreset').addEventListener('change', applyPreset);
    recharge automatiquement : c'est un tableau de bord, pas un formulaire. */
 let _autoTimer=null;
 ['cChauf','cPreset','cFrom','cTo'].forEach(id=>$(id).addEventListener('change', ()=>{
+  _reqSeq++; /* invalide immédiatement la requête déjà partie, avant le debounce */
   _sheet=null; $('cSheet').classList.add('hidden'); $('cErr').textContent='';
+  $('cSumup').value=''; $('cTaxiCheque').value=''; $('cPaymentErr').textContent='';
+  $('cSumup').removeAttribute('aria-invalid'); $('cTaxiCheque').removeAttribute('aria-invalid');
   clearTimeout(_autoTimer);
   _autoTimer=setTimeout(()=>{ if($('cChauf').value && $('cFrom').value && $('cTo').value) loadSheet(); }, 250);
 }));
@@ -896,7 +1141,7 @@ async function loadSheet(){
      aucun historique hors période ne quitte le serveur. */
   const r=await api('/rest/v1/rpc/carnet_periode',{method:'POST',body:JSON.stringify({p_driver:uid, p_from:from, p_to:to})});
   if(my!==_reqSeq) return;                      /* réponse périmée : on la jette */
-  b.disabled=false; b.textContent='Charger la fiche';
+  b.disabled=false; b.textContent='Calculer cette période';
   if(!r.ok){
     $('cErr').textContent = (r.status===404)
       ? 'Fonction absente — lance le SQL de l\'Étape 7 (etape7-recette-periode.sql).'
@@ -911,7 +1156,7 @@ async function loadSheet(){
   const fpk=Number(db.fuelPerKm);
   if(isFinite(fpk) && fpk>0 && !num('cFuelKm')) $('cFuelKm').value=String(fpk).replace('.',',');
   const R=x=>Math.round(x*100)/100;
-  let brut=0, net=0, cash=0, km=0, charges=0, nDays=0, kmMissing=0;
+  let brut=0, net=0, onboard=0, km=0, charges=0, nDays=0, kmMissing=0;
   const rows=[];
   /* On n'accepte QUE des clés de jour au format attendu : le carnet vient du
      téléphone du chauffeur, donc son contenu n'est pas de confiance. */
@@ -925,18 +1170,18 @@ async function loadSheet(){
     if(!worked) return;
     const dBrut=R(rides.reduce((a,x)=>a+x.amt,0));
     const dNet =R(rides.reduce((a,x)=>a+cRideNet(db,x),0));
-    const dCash=R(rides.reduce((a,x)=>a+cRideCash(db,x),0));
+    const dOnboard=R(rides.reduce((a,x)=>a+cRideOnboard(x),0));
     const dCh  =R(dCharges.reduce((a,c)=>a+Number(c.amt),0));
     let dKm=null;
     /* km convertis en nombres : en chaînes, "100" >= "99" est FAUX (comparaison
        lexicographique) et produisait un kilométrage négatif. */
     const kS=Number(d.kmStart), kE=Number(d.kmEnd);
     if(d.kmStart!=null && d.kmEnd!=null && isFinite(kS) && isFinite(kE) && kE>=kS) dKm=kE-kS; else kmMissing++;
-    nDays++; brut+=dBrut; net+=dNet; cash+=dCash; charges+=dCh; if(dKm) km+=dKm;
-    rows.push({k,dBrut,dNet,dCash,dCh,dKm,n:rides.length});
+    nDays++; brut+=dBrut; net+=dNet; onboard+=dOnboard; charges+=dCh; if(dKm) km+=dKm;
+    rows.push({k,dBrut,dNet,dOnboard,dCh,dKm,n:rides.length});
   });
-  brut=R(brut); net=R(net); cash=R(cash); charges=R(charges);
-  _sheet={uid,from,to,brut,net,cash,km,charges,nDays,kmMissing,rows,who};
+  brut=R(brut); net=R(net); onboard=R(onboard); charges=R(charges);
+  _sheet={uid,from,to,brut,net,onboard,km,charges,nDays,kmMissing,rows,who};
   renderSheet();
   $('cSheet').classList.remove('hidden');
 }
@@ -949,16 +1194,16 @@ function renderSheet(){
     '<div class="cbox"><div class="v">'+eur(s.net)+'</div><div class="k">Recette nette</div></div>'+
     '<div class="cbox"><div class="v">'+eur(s.brut)+'</div><div class="k">Recette brute</div></div>'+
     '<div class="cbox"><div class="v">'+eur(comm)+'</div><div class="k">Commissions</div></div>'+
-    '<div class="cbox"><div class="v">'+eur(s.cash)+'</div><div class="k">Cash encaissé</div></div>'+
+    '<div class="cbox"><div class="v">'+eur(s.onboard)+'</div><div class="k">Cash + SumUp + chèques</div></div>'+
     '<div class="cbox"><div class="v">'+s.km+'</div><div class="k">Km parcourus</div></div>'+
     '<div class="cbox"><div class="v">'+s.nDays+'</div><div class="k">Jours travaillés</div></div>'+
     (s.charges>0?'<div class="cbox"><div class="v">'+eur(s.charges)+'</div><div class="k">Charges notées</div></div>':'');
   $('cChCFill').classList.toggle('hidden', !(s.charges>0));
   $('cKmNote').innerHTML = s.kmMissing
-    ? '⚠ '+s.kmMissing+' jour(s) travaillé(s) sans relevé de km complet — ces km ne sont pas comptés, donc le carburant est sous-estimé.'
+    ? 'Attention : '+s.kmMissing+' jour(s) travaillé(s) sans relevé de km complet — ces km ne sont pas comptés, donc le carburant est sous-estimé.'
     : '';
-  $('cDetail').innerHTML='<table class="led"><thead><tr><th>Jour</th><th>Courses</th><th>Brut</th><th>Net</th><th>Cash</th><th>Km</th></tr></thead><tbody>'+
-    (s.rows.length?s.rows.map(r=>'<tr><td>'+r.k+'</td><td>'+r.n+'</td><td>'+eur(r.dBrut)+'</td><td>'+eur(r.dNet)+'</td><td>'+eur(r.dCash)+'</td><td>'+(r.dKm==null?'—':r.dKm)+'</td></tr>').join('')
+  $('cDetail').innerHTML='<table class="led"><thead><tr><th>Jour</th><th>Courses</th><th>Brut</th><th>Net</th><th>À bord</th><th>Km</th></tr></thead><tbody>'+
+    (s.rows.length?s.rows.map(r=>'<tr><td>'+r.k+'</td><td>'+r.n+'</td><td>'+eur(r.dBrut)+'</td><td>'+eur(r.dNet)+'</td><td>'+eur(r.dOnboard)+'</td><td>'+(r.dKm==null?'—':r.dKm)+'</td></tr>').join('')
       :'<tr><td colspan="6" class="muted">Aucun jour travaillé sur la période.</td></tr>')+
     '</tbody></table>';
   compute();
@@ -986,11 +1231,45 @@ function compute(){
   const pat=R(shareP-fP+CP-CC);
   const chf=R(shareC+P-fC+CC-CP);                                      /* le pourboire revient en entier au chauffeur */
 
-  const keeps=$('cKeepCash').value==='1';
-  const solde=R((keeps? s.cash : 0)-chf);                              /* >0 : le chauffeur doit au patron */
+  const sumup=cMoneyInput('cSumup'), cheque=cMoneyInput('cTaxiCheque');
+  const missing=sumup===null||cheque===null;
+  const invalid=Number.isNaN(sumup)||Number.isNaN(cheque);
+  const settlement=(!missing&&!invalid) ? cSettlement(s.onboard,sumup,cheque,chf) : null;
+  const over=!!(settlement&&!settlement.valid);
+  const markInvalid=(id,bad)=>bad ? $(id).setAttribute('aria-invalid','true') : $(id).removeAttribute('aria-invalid');
+  markInvalid('cSumup',Number.isNaN(sumup)||over);
+  markInvalid('cTaxiCheque',Number.isNaN(cheque)||over);
+  $('cPaymentErr').textContent=invalid
+    ? 'Utilise des montants positifs, par exemple 0,00 ou 125,50.'
+    : (over ? 'SumUp + chèques taxi ('+eur(settlement.patronHeld)+') dépassent les encaissements à bord ('+eur(s.onboard)+').' : '');
 
   /* une valeur calculée à zéro s'affiche « 0,00 € » : « — » se lirait « sans objet » */
   const cell=v=>'<td'+(v<0?' class="neg"':'')+'>'+((v===undefined||v===null||!isFinite(v))?'—':eur(v))+'</td>';
+  let settlementHtml='';
+  if(missing){
+    settlementHtml='<div class="settle pending">'+
+      '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT À COMPLÉTER</div>'+
+      '<div class="big">Saisis les montants SumUp et chèques taxi.</div>'+
+    '</div>';
+  } else if(invalid||over){
+    settlementHtml='<div class="settle pending">'+
+      '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT EN ATTENTE</div>'+
+      '<div class="big">Vérifie les deux montants encaissés par le patron.</div>'+
+    '</div>';
+  } else {
+    const solde=settlement.balance;                                    /* >0 : le chauffeur doit au patron */
+    settlementHtml='<div class="settle'+(solde<-.004?' owe':'')+'">'+
+      '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT</div>'+
+      '<div class="holding-summary">'+
+        '<span><strong>'+eur(settlement.patronHeld)+'</strong> chez le patron · SumUp '+eur(settlement.sumup)+' + chèques '+eur(settlement.cheque)+'</span>'+
+        '<span><strong>'+eur(settlement.chauffeurCash)+'</strong> cash chez le chauffeur</span>'+
+      '</div>'+
+      '<div class="big">'+(Math.abs(solde)<0.005
+        ? 'Compte soldé — personne ne doit rien.'
+        : (solde>0 ? 'Le chauffeur doit '+eur(solde)+' au patron'
+                   : 'Le patron doit '+eur(-solde)+' au chauffeur'))+'</div>'+
+    '</div>';
+  }
   $('cResult').innerHTML='<h3>Résultat</h3><div style="overflow-x:auto"><table class="led">'+
     '<thead><tr><th>Ligne</th><th>Patron</th><th>Chauffeur</th></tr></thead><tbody>'+
     '<tr><td>Recette à partager ('+eur(base)+')</td>'+cell(shareP)+cell(shareC)+'</tr>'+
@@ -1000,17 +1279,11 @@ function compute(){
     (CC>0?'<tr><td>Charge faveur chauffeur — le patron rembourse</td>'+cell(-CC)+cell(CC)+'</tr>':'')+
     '<tr class="tot"><td>Net</td>'+cell(pat)+cell(chf)+'</tr>'+
     '</tbody></table></div>'+
-    (tipRaw>s.net ? '<p class="chelp" style="color:var(--danger)">⚠ Le pourboire saisi ('+eur(tipRaw)+') dépasse la recette nette — ramené à '+eur(P)+'. Vérifie le montant.</p>' : '')+
-    '<div class="settle'+(solde>0?'':' owe')+'">'+
-      '<div class="muted" style="font-size:12.5px;font-weight:600">RÈGLEMENT'+(keeps?' — le chauffeur a gardé '+eur(s.cash)+' en cash':' — le chauffeur a tout remis')+'</div>'+
-      '<div class="big">'+(Math.abs(solde)<0.005
-        ? 'Compte soldé — personne ne doit rien.'
-        : (solde>0 ? 'Le chauffeur doit '+eur(solde)+' au patron'
-                   : 'Le patron doit '+eur(-solde)+' au chauffeur'))+'</div>'+
-    '</div>';
+    (tipRaw>s.net ? '<p class="chelp" style="color:var(--danger)">Attention : le pourboire saisi ('+eur(tipRaw)+') dépasse la recette nette — ramené à '+eur(P)+'. Vérifie le montant.</p>' : '')+
+    settlementHtml;
 }
 /* recalcul en direct */
-['cPct','cPctD','cTip','cFuelKm','cFuelWho','cChP','cChC','cKeepCash'].forEach(id=>{
+['cPct','cPctD','cTip','cFuelKm','cFuelWho','cChP','cChC','cSumup','cTaxiCheque'].forEach(id=>{
   $(id).addEventListener('input', e=>{
     if(id==='cPct'){ const v=Math.min(100,Math.max(0,pct('cPct'))); $('cPctD').value=String(Math.round((100-v)*100)/100).replace('.',','); }
     if(id==='cPctD'){ const v=Math.min(100,Math.max(0,pct('cPctD'))); $('cPct').value=String(Math.round((100-v)*100)/100).replace('.',','); }
@@ -1028,10 +1301,12 @@ $('cChCFill').addEventListener('click', ()=>{ if(_sheet){ $('cChC').value=_sheet
 /* ---- events ---- */
 $('loginForm').addEventListener('submit', async e=>{
   e.preventDefault(); $('lgErr').textContent='';
-  const b=$('lgSubmit'); b.disabled=true; b.textContent='Connexion…';
+  const form=$('loginForm'), b=$('lgSubmit');
+  form.setAttribute('aria-busy','true'); b.disabled=true; b.textContent='Connexion…';
   let res; try{ res=await login($('lgUser').value, $('lgPass').value); }catch(_){ res={ok:false,msg:'Erreur.'}; }
-  b.disabled=false; b.textContent='Se connecter';
-  if(res.ok){ $('lgPass').value=''; showApp(); } else $('lgErr').textContent=res.msg;
+  form.setAttribute('aria-busy','false'); b.disabled=false; b.textContent='Se connecter';
+  if(res.ok){ $('lgPass').value=''; showApp(); }
+  else { $('lgErr').textContent=res.msg; $('lgUser').focus(); }
 });
 $('logoutBtn').addEventListener('click', ()=>{ if(confirm('Se déconnecter ?')) logout(); });
 
@@ -1041,6 +1316,9 @@ loadSession();
   if(session && await ensureFresh() && session.profile && session.profile.role===APP_ROLE){ showApp(); }
   else { if(session) clearSession(); showLogin(); }
 })();
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>

@@ -15,7 +15,21 @@ language sql
 stable
 security definer
 set search_path = public
-as $$ select role::text from public.profiles where id = auth.uid() $$;
+as $$
+  select p.role::text
+  from public.profiles p
+  where p.id = auth.uid()
+    and p.active
+    and (
+      p.role::text = 'superadmin'
+      or p.fleet_id is null
+      or exists (
+        select 1
+        from public.fleets f
+        where f.id = p.fleet_id and not f.suspended
+      )
+    )
+$$;
 
 revoke all on function public.my_role_sd() from public;
 grant execute on function public.my_role_sd() to authenticated;
